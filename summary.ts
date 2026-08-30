@@ -84,10 +84,13 @@ export function summarizeWorkoutText(
         completedSets += 1;
         totalReps += set.reps;
         const unit = typeof weight === "number" ? null : weight.unit;
-        if (totalVolumeUnit == null && unit != null) {
+        if (totalVolumeUnit == null && unit != null && set.seconds == null) {
           totalVolumeUnit = unit;
         }
-        estimatedDurationSeconds += (ex.restSeconds || 0) + workSecondsPerSet;
+        // Timed (stretch) sets count their hold as the work time; strength
+        // sets use the fixed per-set allowance.
+        estimatedDurationSeconds +=
+          (set.restSeconds ?? ex.restSeconds) + (set.seconds ?? workSecondsPerSet);
       }
     }
   }

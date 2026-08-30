@@ -52,6 +52,15 @@
   min-width: 5ch;
 }
 
+.liftoscript-stretch-set .liftoscript-set-label {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.liftoscript-stretch-timer {
+  margin-left: auto;
+}
+
 .liftoscript-rest-start,
 .liftoscript-rest-stop {
   cursor: pointer;

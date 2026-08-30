@@ -209,5 +209,21 @@
   {"id":"archHang","name":"Arch Hang","equipment":"bodyweight"},
   {"id":"supportHold","name":"Support Hold","equipment":"bodyweight"},
   {"id":"pallofPress","name":"Pallof Press","equipment":"cable"},
-  {"id":"renegadeRow","name":"Renegade Row","equipment":"dumbbell"}
+  {"id":"renegadeRow","name":"Renegade Row","equipment":"dumbbell"},
+  {"id":"armCircles","name":"Arm Circles","equipment":"mobility","category":"stretch"},
+  {"id":"butterflyStretch","name":"Butterfly Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"calfStretch","name":"Calf Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"figureFourStretch","name":"Figure Four Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"hamstringStretch","name":"Hamstring Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"hipFlexorStretch","name":"Hip Flexor Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"kneelingQuadStretch","name":"Kneeling Quad Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"lyingGluteStretch","name":"Lying Glute Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"neckStretch","name":"Neck Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"pigeonPose","name":"Pigeon Pose","equipment":"mobility","category":"stretch"},
+  {"id":"shoulderStretch","name":"Shoulder Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"standingQuadStretch","name":"Standing Quad Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"tricepsStretch","name":"Triceps Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"worldsGreatestStretch","name":"World's Greatest Stretch","equipment":"mobility","category":"stretch"},
+  {"id":"childsPose","name":"Child's Pose","equipment":"mobility","category":"stretch"},
+  {"id":"downwardDog","name":"Downward Dog","equipment":"mobility","category":"stretch"}
 ]

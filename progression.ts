@@ -47,6 +47,10 @@ export function lpArgs(progress: ParsedExercise["progress"]): string[] | null {
  * lp signature: lp(increment, successes, counter, decrement, failures, failCounter)
  */
 export function computeNextExercise(exercise: ParsedExercise): NextExercise | null {
+  // Stretches carry over unchanged: there is no weight or rep to progress.
+  if (exercise.isStretch) {
+    return null;
+  }
   const args = lpArgs(exercise.progress);
   if (!args) {
     return null;

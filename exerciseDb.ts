@@ -13,6 +13,7 @@ export interface Exercise {
   id: string;
   name: string;
   equipment: string;
+  category?: "stretch" | "strength" | string;
 }
 
 const EXERCISES = exerciseData as Exercise[];

@@ -52,6 +52,11 @@ function buildExerciseCard(
 
   const setsContainer = card.createDiv({ cls: "liftoscript-sets" });
 
+  if (exercise.isStretch) {
+    buildStretchSets(setsContainer, exercise, opts);
+    return;
+  }
+
   exercise.sets.forEach((set, i) => {
     const row = setsContainer.createDiv({ cls: "liftoscript-set" });
     const checkbox = row.createEl("input", {
@@ -120,6 +125,77 @@ function buildExerciseCard(
       stopBtn.setAttribute("style", "display:none");
     });
   }
+}
+
+/**
+ * Build the set rows for a stretch exercise. No weight is shown; each row has
+ * a checkbox, the hold duration, and a countdown. Ticking a set starts the
+ * hold timer, then the rest timer if one is configured.
+ */
+function buildStretchSets(
+  container: HTMLElement,
+  exercise: ParsedExercise,
+  opts: CardOptions
+): void {
+  exercise.sets.forEach((set, i) => {
+    const hold = set.seconds ?? 0;
+    const rest = set.restSeconds ?? exercise.restSeconds;
+
+    const row = container.createDiv({ cls: "liftoscript-set liftoscript-stretch-set" });
+    const checkbox = row.createEl("input", { type: "checkbox", cls: "liftoscript-set-checkbox" });
+    const isCompleted = opts.completedMask?.[i] ?? set.completed;
+    checkbox.checked = isCompleted;
+
+    const label = row.createDiv({ cls: "liftoscript-set-label" });
+    label.setText(rest > 0 ? `${hold}s hold + ${rest}s rest` : `${hold}s hold`);
+
+    const timer = row.createDiv({ cls: "liftoscript-rest-timer liftoscript-stretch-timer" });
+    timer.setText(`Hold ${renderSeconds(hold)}`);
+
+    const startHoldTimer = () => {
+      if (hold <= 0) {
+        return;
+      }
+      startRest(hold, (remaining) => {
+        timer.setText(`Hold ${renderSeconds(remaining)}`);
+      }, () => {
+        if (rest > 0) {
+          timer.setText(`Rest ${renderSeconds(rest)}`);
+          startRest(rest, (remaining) => {
+            timer.setText(`Rest ${renderSeconds(remaining)}`);
+          }, () => {
+            notifyRestComplete(`Stretch complete for ${exercise.name}!`);
+            timer.setText("Done");
+          });
+        } else {
+          notifyRestComplete(`Stretch complete for ${exercise.name}!`);
+          timer.setText("Done");
+        }
+      });
+    };
+
+    checkbox.addEventListener("change", () => {
+      set.completed = checkbox.checked;
+      row.classList.toggle("liftoscript-set-done", checkbox.checked);
+      if (set.markerStart != null && set.markerEnd != null) {
+        opts.onSetToggled?.(
+          exercise.raw,
+          set.markerStart,
+          set.markerEnd,
+          checkbox.checked,
+          opts.sourcePath
+        );
+      }
+      if (checkbox.checked) {
+        startHoldTimer();
+      } else {
+        stopRest();
+        timer.setText(`Hold ${renderSeconds(hold)}`);
+      }
+    });
+
+    row.classList.toggle("liftoscript-set-done", isCompleted);
+  });
 }
 
 export function renderLiftoscriptBlocks(

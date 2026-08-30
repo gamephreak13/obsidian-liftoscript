@@ -1,3 +1,5 @@
+import exerciseData from "./exercises.json";
+
 /*
  * parser.ts
  *
@@ -25,6 +27,26 @@ export type ScalarValue = number | IWeight | IPercentage;
 export type EvalValue = ScalarValue | boolean | (ScalarValue | undefined)[] | undefined;
 
 const DEFAULT_UNIT: Unit = "lb";
+
+/** Matches a manual "type: stretch" tag on an exercise line. */
+const STRETCH_TAG_RE = /type\s*:\s*stretch\b/i;
+
+interface ExerciseRecord {
+  id: string;
+  name: string;
+  equipment?: string;
+  category?: string;
+}
+
+const EXERCISE_RECORDS = exerciseData as ExerciseRecord[];
+
+/** True when the exercise name matches a "stretch" entry in the database. */
+export function isStretchExerciseName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return EXERCISE_RECORDS.some(
+    (e) => e.category === "stretch" && e.name.toLowerCase() === normalized
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* Weight helpers (ported from src/models/weight.ts)                   */
@@ -1739,6 +1761,10 @@ export interface ParsedExerciseSet {
   /** char offset into the raw line where this set's completion marker lives */
   markerStart?: number;
   markerEnd?: number;
+  /** Hold duration in seconds for timed (stretch) sets. */
+  seconds?: number;
+  /** Per-set rest in seconds after the hold, from "H|R" stretch syntax. */
+  restSeconds?: number;
 }
 
 export interface ParsedExercise {
@@ -1748,6 +1774,7 @@ export interface ParsedExercise {
   specStart: number;
   sets: ParsedExerciseSet[];
   restSeconds: number;
+  isStretch: boolean;
   progress?: {
     type: "lp" | "dp" | "sum" | "custom" | "none";
     args: string[];
@@ -1832,27 +1859,60 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
     }
   }
 
-  // Parse set tokens like "5x100lb", "8x42.5kg" - each token is ONE set of
-  // <reps>x<weight>. Multiple sets are comma-separated on the same line.
+  // Stretch exercises are categorized via a "type: stretch" tag on the line or
+  // via a "stretch" entry in the exercise database.
+  const isStretch = STRETCH_TAG_RE.test(spec) || isStretchExerciseName(name);
+
+  // Parse set tokens. Strength lines use "5x100lb" style tokens, where each
+  // token is ONE set of <reps>x<weight>. Stretch lines use time-based specs
+  // like "3x60s" (3 sets of 60s) and may carry a per-set rest via "60s|30s",
+  // and they ignore weight and rep counts entirely.
   const sets: ParsedExerciseSet[] = [];
   let setNumber = setStart;
-  const setTokenRe = /(\d+)x(\d+(?:\.\d+)?)\s*(lb|kg)/g;
-  let m: RegExpExecArray | null;
-  while ((m = setTokenRe.exec(rest))) {
-    const reps = parseInt(m[1], 10);
-    const weightValue = parseFloat(m[2]);
-    const unit = m[3] as Unit;
-    const marker = markers[sets.length];
-    sets.push({
-      setNumber,
-      weight: weightBuild(weightValue, unit),
-      reps,
-      isAmrap: false,
-      completed: marker ? marker.completed : false,
-      markerStart: marker?.start,
-      markerEnd: marker?.end,
-    });
-    setNumber += 1;
+  if (isStretch) {
+    const stretchTokenRe = /(?:(\d+)x)?(\d+(?:\.\d+)?)s(?:\|(\d+(?:\.\d+)?)s)?/gi;
+    let sm: RegExpExecArray | null;
+    while ((sm = stretchTokenRe.exec(rest))) {
+      const count = sm[1] ? parseInt(sm[1], 10) : 1;
+      const holdSeconds = parseFloat(sm[2]);
+      const stretchRest = sm[3] ? parseFloat(sm[3]) : undefined;
+      for (let i = 0; i < count; i++) {
+        const marker = markers[sets.length];
+        sets.push({
+          setNumber,
+          weight: weightBuild(0, DEFAULT_UNIT),
+          reps: 0,
+          isAmrap: false,
+          completed: marker ? marker.completed : false,
+          markerStart: marker?.start,
+          markerEnd: marker?.end,
+          seconds: holdSeconds,
+          restSeconds: stretchRest,
+        });
+        setNumber += 1;
+      }
+    }
+  }
+
+  if (sets.length === 0) {
+    const setTokenRe = /(\d+)x(\d+(?:\.\d+)?)\s*(lb|kg)/g;
+    let m: RegExpExecArray | null;
+    while ((m = setTokenRe.exec(rest))) {
+      const reps = parseInt(m[1], 10);
+      const weightValue = parseFloat(m[2]);
+      const unit = m[3] as Unit;
+      const marker = markers[sets.length];
+      sets.push({
+        setNumber,
+        weight: weightBuild(weightValue, unit),
+        reps,
+        isAmrap: false,
+        completed: marker ? marker.completed : false,
+        markerStart: marker?.start,
+        markerEnd: marker?.end,
+      });
+      setNumber += 1;
+    }
   }
 
   return {
@@ -1861,6 +1921,7 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
     specStart: markers.length > 0 ? markers[0].start : lineOffset,
     sets,
     restSeconds,
+    isStretch,
     progress,
   };
 }
