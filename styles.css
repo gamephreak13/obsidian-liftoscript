@@ -1,0 +1,58 @@
+/* Liftoscript - rendered workout UI */
+
+.liftoscript {
+  margin: 0.5rem 0;
+}
+
+.liftoscript-exercise {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+  background: var(--background-secondary);
+}
+
+.liftoscript-exercise-header {
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.liftoscript-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.liftoscript-set {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.liftoscript-set-checkbox {
+  margin: 0;
+}
+
+.liftoscript-set-done .liftoscript-set-label {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.liftoscript-rest {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.liftoscript-rest-timer {
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch;
+}
+
+.liftoscript-rest-start,
+.liftoscript-rest-stop {
+  cursor: pointer;
+}
