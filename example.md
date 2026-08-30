@@ -134,6 +134,29 @@ in the plugin — no external file needed).
 
 ---
 
+## 9. Stretch exercises
+
+Stretches are timed holds, not weighted sets — weight and reps are ignored. Use
+`sets x seconds`, with an optional per-set rest via `60s|30s`:
+
+````markdown
+```liftoscript
+[ ] [ ] [ ] Hamstring Stretch / 3x60s
+[ ] [ ] [ ] Standing Quad Stretch / 2x45s|30s
+[ ] [ ] [ ] [ ] Deep Squat Hold / 4x40s, rest: 20, type: stretch
+```
+````
+
+- `3x60s` = 3 sets of 60-second holds; `60s|30s` = hold 60s then rest 30s (per set).
+- Names matching the built-in stretch category (Hamstring Stretch, Calf Stretch, etc.)
+  are detected automatically; anything else needs a `type: stretch` tag.
+- **Ticking a set checkbox starts the hold timer immediately**, then the rest
+  timer, and finally a Notice + chime. No weight is ever shown.
+- Stretches skip progressive overload in **Generate Next Workout** — durations
+  carry over untouched — and add no `total_volume`, only sets and duration.
+
+---
+
 ## Every feature at a glance
 
 ````markdown
@@ -141,6 +164,7 @@ in the plugin — no external file needed).
 [x] [ ] [ ] Basic / 5x100lb, 5x100lb, 5x100lb, rest: 90
 [x] [x] [x] [x] [x] Progressing / 5x100lb, 5x100lb, 5x100lb, 5x100lb, 5x100lb, rest: 90, progress: lp(5lb, 1, 0)
 [] [] [] [] [] Varied / 5x100lb, 5x100lb, 5x95lb, 5x95lb, 5x95lb, rest: 60
+[x] [ ] [ ] Hamstring Stretch / 3x60s|30s
 ```
 ````
 

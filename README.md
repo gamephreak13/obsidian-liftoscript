@@ -29,6 +29,7 @@ An [Obsidian](https://obsidian.md) plugin that integrates **Liftoscript** — th
 | Rest-complete notification (Notice + embedded audio chime) | `notify.ts` |
 | Checkboxes persisted back into the raw markdown | `setCompletion.ts` |
 | Exercise autocomplete in the editor | `exerciseDb.ts` |
+| Stretch exercises: timed sets + auto countdown (no weight/progression) | `parser.ts` / `liftoscriptRender.ts` |
 | Session summarization (volume, sets, duration) | `summary.ts` |
 | YAML frontmatter metric injection | `frontmatter.ts` |
 | `lp()` progressive overload | `progression.ts` / `parser.ts` |
@@ -190,6 +191,34 @@ The plugin rewrites the `lp()` so its counter reflects the real history (e.g. `l
 
 ---
 
+## Stretch Exercises
+
+Exercises categorized as `stretch` in the built-in database — or any line tagged
+manually with `type: stretch` — are treated purely as **timed holds**. Weight and
+reps are ignored.
+
+```liftoscript
+[ ] [ ] [ ] Hamstring Stretch / 3x60s
+```
+
+| Part | Meaning |
+| --- | --- |
+| `3x60s` | **3 sets × 60-second hold**. Format is `sets x seconds`. |
+| `60s\|30s` | Per-set rest after each hold (hold 60s, rest 30s). |
+| `rest: N` | Exercise-level rest, used when no `60s\|30s` is given. |
+| `type: stretch` | Manual tag for an exercise not in the database. |
+
+In reading view each stretch set renders as a checkbox plus its hold duration —
+no weight is shown. **Ticking a checkbox immediately starts the hold countdown**,
+then the rest countdown (if configured), ending in a Notice plus chime.
+
+Stretches are excluded from progressive overload: **Generate Next Workout** carries
+them over with their durations untouched. They count toward `completed_sets` and
+`session_duration` (the hold replaces the flat per-set work allowance) but add
+**zero** `total_volume`.
+
+---
+
 ## Full Example
 
 A whole workout note start to finish:
@@ -225,7 +254,7 @@ npm run build      # production build -> main.js
 ```
 
 - `main.ts` — plugin entry point (registers commands, suggest, post-processor).
-- `parser.ts` — standalone port of Liftoscript's evaluator + weight model + linear progression.
+- `parser.ts` — standalone port of Liftoscript's evaluator + weight model + linear progression + timed stretch sets.
 - Build output: `main.js`, `manifest.json`, `styles.css`.
 
 **No external runtime dependencies** — the plugin only uses Obsidian's standard APIs, and the notification chime is embedded as a Base64 data URI so it's fully self-contained.
