@@ -1,0 +1,9 @@
+{
+	"id": "obsidian-liftoscript",
+	"name": "Liftoscript",
+	"version": "0.1.0",
+	"minAppVersion": "1.0.0",
+	"description": "Integrates Liftoscript from Liftosaur into Obsidian.",
+	"author": "gp13",
+	"isDesktopOnly": false
+}
