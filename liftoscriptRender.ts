@@ -2,6 +2,7 @@ import { MarkdownPostProcessorContext, MarkdownPostProcessor, Plugin } from "obs
 import { parseExerciseLine, ParsedExercise, ParsedExerciseSet, weightPrint } from "./parser";
 import { startRest, stopRest } from "./restTimer";
 import { notifyRestComplete } from "./notify";
+import { startStretchHold, attachStretchTimer, stopStretchTimer, StretchTick } from "./stretchTimer";
 
 /*
  * liftoscriptRender.ts
@@ -128,9 +129,11 @@ function buildExerciseCard(
 }
 
 /**
- * Build the set rows for a stretch exercise. No weight is shown; each row has
- * a checkbox, the hold duration, and a countdown. Ticking a set starts the
- * hold timer, then the rest timer if one is configured.
+ * Build the set rows for a stretch exercise. No weight is shown; each row has a
+ * checkbox, the hold duration, and a countdown. Ticking a set starts the hold
+ * countdown, then the rest countdown if one is configured. Countdown state
+ * lives in stretchTimer.ts so it survives Obsidian re-rendering the note after
+ * the completion marker is persisted.
  */
 function buildStretchSets(
   container: HTMLElement,
@@ -140,6 +143,7 @@ function buildStretchSets(
   exercise.sets.forEach((set, i) => {
     const hold = set.seconds ?? 0;
     const rest = set.restSeconds ?? exercise.restSeconds;
+    const key = `${opts.sourcePath}|${exercise.raw}|${set.setNumber}`;
 
     const row = container.createDiv({ cls: "liftoscript-set liftoscript-stretch-set" });
     const checkbox = row.createEl("input", { type: "checkbox", cls: "liftoscript-set-checkbox" });
@@ -152,27 +156,19 @@ function buildStretchSets(
     const timer = row.createDiv({ cls: "liftoscript-rest-timer liftoscript-stretch-timer" });
     timer.setText(`Hold ${renderSeconds(hold)}`);
 
-    const startHoldTimer = () => {
-      if (hold <= 0) {
-        return;
+    const updateTimer = (tick: StretchTick) => {
+      if (tick.phase === "hold") {
+        timer.setText(`Hold ${renderSeconds(tick.remaining)}`);
+      } else if (tick.phase === "rest") {
+        timer.setText(`Rest ${renderSeconds(tick.remaining)}`);
+      } else {
+        timer.setText("Done");
       }
-      startRest(hold, (remaining) => {
-        timer.setText(`Hold ${renderSeconds(remaining)}`);
-      }, () => {
-        if (rest > 0) {
-          timer.setText(`Rest ${renderSeconds(rest)}`);
-          startRest(rest, (remaining) => {
-            timer.setText(`Rest ${renderSeconds(remaining)}`);
-          }, () => {
-            notifyRestComplete(`Stretch complete for ${exercise.name}!`);
-            timer.setText("Done");
-          });
-        } else {
-          notifyRestComplete(`Stretch complete for ${exercise.name}!`);
-          timer.setText("Done");
-        }
-      });
     };
+
+    // If a session is already running (e.g. this render follows a marker
+    // write), point it at the fresh timer element and resync its text.
+    attachStretchTimer(key, updateTimer);
 
     checkbox.addEventListener("change", () => {
       set.completed = checkbox.checked;
@@ -187,9 +183,15 @@ function buildStretchSets(
         );
       }
       if (checkbox.checked) {
-        startHoldTimer();
+        startStretchHold({
+          key,
+          hold,
+          rest,
+          message: `Stretch complete for ${exercise.name}!`,
+          onTick: updateTimer,
+        });
       } else {
-        stopRest();
+        stopStretchTimer(key);
         timer.setText(`Hold ${renderSeconds(hold)}`);
       }
     });
