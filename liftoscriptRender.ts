@@ -143,7 +143,12 @@ function buildStretchSets(
   exercise.sets.forEach((set, i) => {
     const hold = set.seconds ?? 0;
     const rest = set.restSeconds ?? exercise.restSeconds;
-    const key = `${opts.sourcePath}|${exercise.raw}|${set.setNumber}`;
+    // Key by the marker-free spec. exercise.raw includes the "[ ]"/"[x]"
+    // markers, which flip when the checkbox is persisted - that would change
+    // the key on re-render and orphan the running session. The spec text is
+    // stable because "[ ]" and "[x]" have the same char length.
+    const spec = exercise.raw.substring(exercise.specStart).trim();
+    const key = `${opts.sourcePath}|${spec}|${set.setNumber}`;
 
     const row = container.createDiv({ cls: "liftoscript-set liftoscript-stretch-set" });
     const checkbox = row.createEl("input", { type: "checkbox", cls: "liftoscript-set-checkbox" });

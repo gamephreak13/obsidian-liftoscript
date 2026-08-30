@@ -1918,7 +1918,7 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
   return {
     name,
     raw: line,
-    specStart: markers.length > 0 ? markers[0].start : lineOffset,
+    specStart,
     sets,
     restSeconds,
     isStretch,
