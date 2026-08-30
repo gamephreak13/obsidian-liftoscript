@@ -62,7 +62,7 @@ function buildExerciseCard(
     checkbox.checked = isCompleted;
 
     const label = row.createDiv({ cls: "liftoscript-set-label" });
-    label.setText(`${set.setNumber}. ${set.reps} reps @ ${weightPrint(set.weight)}`);
+    label.setText(`${set.reps} reps @ ${weightPrint(set.weight)}`);
 
     checkbox.addEventListener("change", () => {
       set.completed = checkbox.checked;
