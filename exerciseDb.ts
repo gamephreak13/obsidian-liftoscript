@@ -16,10 +16,50 @@ export interface Exercise {
   category?: "stretch" | "strength" | string;
 }
 
-const EXERCISES = exerciseData as Exercise[];
+let EXERCISES: Exercise[] = exerciseData as Exercise[];
 
 export function getExercises(): Exercise[] {
   return EXERCISES;
+}
+
+/**
+ * Replace the active exercise database with a custom one (P18: custom JSON
+ * import). Entries may override an existing exercise by matching id (or name)
+ * or be appended when no match exists. Pass an empty array to restore the
+ * built-in database.
+ */
+export function setCustomExercises(custom: Array<Record<string, unknown>>): void {
+  if (!custom || custom.length === 0) {
+    EXERCISES = exerciseData as Exercise[];
+    return;
+  }
+  const merged: Exercise[] = (exerciseData as Exercise[]).slice();
+  const indexByName = new Map<string, number>();
+  merged.forEach((e, i) => {
+    if (e?.name) {
+      indexByName.set(e.name.toLowerCase(), i);
+    }
+  });
+  for (const raw of custom) {
+    const name = typeof raw.name === "string" ? raw.name : "";
+    if (!name) {
+      continue;
+    }
+    const exercise: Exercise = {
+      id: typeof raw.id === "string" ? raw.id : name.toLowerCase().replace(/\s+/g, "-"),
+      name,
+      equipment: typeof raw.equipment === "string" ? raw.equipment : "",
+      category: typeof raw.category === "string" ? raw.category : undefined,
+    };
+    const existingIdx = indexByName.get(name.toLowerCase());
+    if (existingIdx != null) {
+      merged[existingIdx] = exercise;
+    } else {
+      indexByName.set(name.toLowerCase(), merged.length);
+      merged.push(exercise);
+    }
+  }
+  EXERCISES = merged;
 }
 
 export function findExercise(raw: string): Exercise | undefined {
