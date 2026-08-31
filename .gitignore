@@ -11,3 +11,7 @@ npm-debug.log*
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local tooling (not part of the public plugin)
+.omo/
+.codegraph
