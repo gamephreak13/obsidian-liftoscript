@@ -37,6 +37,13 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   ],
 };
 
+/**
+ * Manifest id. Obsidian fully-qualifies command ids as `<this>:<commandId>`,
+ * and Meta Bind buttons call `executeCommandById` with that full id, so they
+ * must reference `obsidian-liftoscript:liftoscript-add-<slug>` (never bare).
+ */
+export const BUTTON_COMMAND_PREFIX = "obsidian-liftoscript";
+
 /** Whether the FAB should render on the current platform for the given mode. */
 export function fabVisibleForMode(mode: LiftoscriptSettings["fabMode"], isMobile: boolean): boolean {
   if (mode === "both") {
@@ -261,8 +268,8 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Quick-add exercise templates").setDesc(
       "One liftoscript line per template. Each becomes a command named " +
-        "\"Liftoscript: Add <exercise>\", which Meta Bind buttons can invoke " +
-        "via a ```meta-bind-button block with \"type: command\" and the command id. " +
+        "\"Liftoscript: Add <exercise>\" (id obsidian-liftoscript:liftoscript-add-<slug>), " +
+        "which a ```meta-bind-button block invokes via \"type: command\" with that full id. " +
         "Changes apply after a plugin reload."
     ).addTextArea((area) =>
       area

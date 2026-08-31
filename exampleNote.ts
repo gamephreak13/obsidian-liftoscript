@@ -1,4 +1,5 @@
 import { App, normalizePath, TFile } from "obsidian";
+import { BUTTON_COMMAND_PREFIX } from "./settings";
 
 /*
  * exampleNote.ts
@@ -53,14 +54,15 @@ metrics** and **Generate Next Workout** from the command palette.
 
 Tapping a button below runs the matching **Liftoscript: Add <exercise>**
 command (via the [Meta Bind](https://www.metabind.org/) plugin) to append a
-fresh line into the active note.
+fresh line into the active note. Meta Bind invokes the command by its fully
+qualified id, so each button's \`command\` is \`obsidian-liftoscript:liftoscript-add-<slug>\`.
 
 \`\`\`meta-bind-button
 label: Add Bench Press
 style: primary
 action:
   type: command
-  command: liftoscript-add-bench-press
+  command: ${BUTTON_COMMAND_PREFIX}:liftoscript-add-bench-press
 \`\`\`
 
 \`\`\`meta-bind-button
@@ -68,7 +70,7 @@ label: Add Squat
 style: primary
 action:
   type: command
-  command: liftoscript-add-squat
+  command: ${BUTTON_COMMAND_PREFIX}:liftoscript-add-squat
 \`\`\`
 `;
 
