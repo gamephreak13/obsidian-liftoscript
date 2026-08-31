@@ -4,18 +4,20 @@ import { BUTTON_COMMAND_PREFIX } from "./settings";
 /*
  * exampleNote.ts
  *
- * P20: on first activation the plugin seeds a Liftosaur-Example.md at the vault
- * root so users immediately see a fully mocked workout, YAML frontmatter, and
- * Meta Bind quick-add buttons. Only created once — an existing note is never
- * overwritten.
+ * P20: a fully mocked example note (Liftosaur-Example.md) that demonstrates
+ * the plugin's checklist rendering, stretch holds, YAML frontmatter, and Meta
+ * Bind quick-add buttons. It is NOT created automatically — the user generates
+ * (and re-generates) it on demand from the plugin settings tab, so no file ever
+ * appears without their explicit action.
  */
 
 /** Path of the seeded example note (vault root). */
 export const EXAMPLE_NOTE_PATH = "Liftosaur-Example.md";
 
 /**
- * Sentinel marking the note as plugin-generated so a stale seeded copy is
- * refreshed on load, while a user's own note at the same path is left alone.
+ * Sentinel marking the note as plugin-generated so a stale generated copy is
+ * refreshed on re-generation, while a user's own note at the same path is left
+ * alone.
  */
 export const EXAMPLE_SENTINEL = "liftoscript_example: true";
 
@@ -81,21 +83,25 @@ action:
 \`\`\`
 `;
 
+/** What ensureExampleNote did, so the settings button can report it. */
+export type ExampleNoteResult = "created" | "refreshed" | "existing";
+
 /**
- * Ensure the example note exists and is current. Creates it on first load;
- * refreshes an existing copy that carries the plugin's sentinel so seed
- * updates (e.g. new button markup) reach the note; never touches a user's own
- * note at the same path.
+ * Generate (or refresh) the example note. Creates it if absent; rewrites an
+ * existing copy that carries the plugin's sentinel so seed updates reach it;
+ * leaves a user's own note at the same path untouched. Returns the outcome.
  */
-export async function ensureExampleNote(app: App): Promise<void> {
+export async function ensureExampleNote(app: App): Promise<ExampleNoteResult> {
   const path = normalizePath(EXAMPLE_NOTE_PATH);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
     const text = await app.vault.cachedRead(existing);
     if (text.includes(EXAMPLE_SENTINEL)) {
       await app.vault.process(existing, () => EXAMPLE_NOTE_CONTENT);
+      return "refreshed";
     }
-    return;
+    return "existing";
   }
   await app.vault.create(path, EXAMPLE_NOTE_CONTENT);
+  return "created";
 }

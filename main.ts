@@ -27,15 +27,12 @@ export default class LiftoscriptPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-		// P20: seed the example note on first activation; a failure must never
-		// block plugin startup.
-		try {
-			await ensureExampleNote(this.app);
-		} catch (e) {
-			console.error("Liftoscript: failed to create example note", e);
-		}
+		// P20: the example note is generated on demand from the settings tab,
+		// never automatically, so no file appears without the user's action.
 		this.addSettingTab(new LiftoscriptSettingTab(this.app, this, () => {
 			void this.applyCustomExercises();
+		}, () => {
+			void this.ensureExampleFile();
 		}));
 
 		this.registerButtonCommands();
@@ -114,6 +111,23 @@ export default class LiftoscriptPlugin extends Plugin {
 	private async appendExerciseLine(file: TFile, line: string) {
 		await atomicModify(this.app, file, (text) => insertLineIntoLastBlock(text, line));
 		new Notice(`Logged ${line.split(" / ")[0].trim()}`);
+	}
+
+	/** Generate/refresh the example note (settings button); reports the outcome. */
+	private async ensureExampleFile() {
+		try {
+			const outcome = await ensureExampleNote(this.app);
+			const label =
+				outcome === "created"
+					? "Liftoscript: created the example note."
+					: outcome === "refreshed"
+						? "Liftoscript: refreshed the example note."
+						: "Liftoscript: a note already exists at that path — left untouched.";
+			new Notice(label);
+		} catch (e) {
+			console.error("Liftoscript: failed to generate example note", e);
+			new Notice("Liftoscript: failed to generate the example note.");
+		}
 	}
 
 	private async generateNextWorkout(previous: TFile) {

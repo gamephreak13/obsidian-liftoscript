@@ -152,15 +152,18 @@ export interface LiftoscriptPluginLike extends Plugin {
 export class LiftoscriptSettingTab extends PluginSettingTab {
   private readonly plugin: () => LiftoscriptPluginLike;
   private readonly onApplyCustom: () => void;
+  private readonly onGenerateExample: () => void;
 
   constructor(
     app: App,
     plugin: LiftoscriptPluginLike,
-    onApplyCustom: () => void
+    onApplyCustom: () => void,
+    onGenerateExample: () => void
   ) {
     super(app, plugin);
     this.plugin = () => plugin;
     this.onApplyCustom = onApplyCustom;
+    this.onGenerateExample = onGenerateExample;
   }
 
   override display(): void {
@@ -214,6 +217,16 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
       "Load and merge the configured custom exercise database now."
     ).addButton((button) =>
       button.setButtonText("Apply").setCta().onClick(() => this.onApplyCustom())
+    );
+
+    containerEl.createEl("h3", { text: "Example note" });
+
+    new Setting(containerEl).setName("Generate example note").setDesc(
+      "Creates (or refreshes) a Liftosaur-Example.md that demonstrates the " +
+        "plugin. Nothing is written until you click this button, and an " +
+        "existing generated copy is updated in place."
+    ).addButton((button) =>
+      button.setButtonText("Generate").setCta().onClick(() => this.onGenerateExample())
     );
 
     containerEl.createEl("h3", { text: "Quick entry" });
