@@ -5,6 +5,7 @@ import { notifyRestComplete } from "./notify";
 import { startStretchHold, attachStretchTimer, stopStretchTimer, StretchTick } from "./stretchTimer";
 import { findExercise, hasExerciseInfo } from "./exerciseDb";
 import { ExerciseInfoModal } from "./exerciseInfoModal";
+import { EditLineModal } from "./editLineModal";
 
 /*
  * liftoscriptRender.ts
@@ -30,6 +31,9 @@ export interface RenderCallbacks {
     completed: boolean,
     sourcePath: string
   ) => void;
+  /** Fired when a rendered card's "Edit" button saves. Carries the old and
+   *  edited raw exercise lines so the caller can rewrite the line in the note. */
+  onEditLine?: (oldLine: string, newLine: string, sourcePath: string) => void;
 }
 
 function renderSeconds(seconds: number): string {
@@ -68,13 +72,14 @@ function buildExerciseCard(
   const card = container.createDiv({ cls: "liftoscript-exercise" });
   const header = card.createDiv({ cls: "liftoscript-exercise-header" });
   header.createDiv({ text: exercise.name, cls: "liftoscript-exercise-name" });
+  const actions = header.createDiv({ cls: "liftoscript-exercise-actions" });
 
   // P30: when the exercise matches a Free Exercise DB entry with media or
   // instructions, render an info (ℹ️) button in the header top-right. Tapping it
   // opens a modal with equipment, muscles, instructions and images.
   const matched = findExercise(exercise.name);
   if (matched && hasExerciseInfo(matched)) {
-    const infoBtn = header.createEl("button", {
+    const infoBtn = actions.createEl("button", {
       cls: "liftoscript-exercise-info",
       attr: { "aria-label": `Show details for ${exercise.name}` },
       text: "ℹ️",
@@ -85,6 +90,28 @@ function buildExerciseCard(
       new ExerciseInfoModal(opts.app, matched).open();
     });
   }
+
+  // P31: an "Edit" button so a mis-logged set (wrong reps/weight) can be
+  // corrected without leaving Reading view. Opens a modal prefilled with the
+  // raw line and writes the edited line back to the note on save.
+  const editBtn = actions.createEl("button", {
+    cls: "liftoscript-exercise-edit",
+    attr: { "aria-label": `Edit ${exercise.name} line` },
+    text: "✎",
+  });
+  editBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    new EditLineModal(opts.app, {
+      line: exercise.raw,
+      name: exercise.name,
+      onSave: (newLine) => {
+        if (newLine !== exercise.raw) {
+          opts.onEditLine?.(exercise.raw, newLine, opts.sourcePath);
+        }
+      },
+    }).open();
+  });
 
   const setsContainer = card.createDiv({ cls: "liftoscript-sets" });
 
@@ -257,6 +284,7 @@ export function renderLiftoscriptBlocks(
     if (exercise.sets.length > 0 || exercise.name) {
       buildExerciseCard(container, exercise, {
         onSetToggled: opts.onSetToggled,
+        onEditLine: opts.onEditLine,
         sourcePath: opts.sourcePath,
         app: opts.app,
       });
@@ -281,6 +309,7 @@ export function registerLiftoscriptPostProcessor(plugin: Plugin, opts?: RenderCa
         wrapper.replaceWith(container);
         renderLiftoscriptBlocks(container, code, {
           onSetToggled: opts?.onSetToggled,
+          onEditLine: opts?.onEditLine,
           sourcePath: ctx.sourcePath,
           app: plugin.app,
         });

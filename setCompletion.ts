@@ -48,3 +48,30 @@ export async function syncSetCompletion(
     return data.substring(0, idx) + newLine + data.substring(idx + line.length);
   });
 }
+
+/**
+ * P31: rewrite an exercise line in the source note after the user edits a
+ * rendered card. Replaces the first occurrence of `oldLine` with `newLine`,
+ * preserving the rest of the document.
+ */
+export async function syncLineEdit(
+  app: App,
+  sourcePath: string,
+  oldLine: string,
+  newLine: string
+): Promise<void> {
+  const file = app.vault.getAbstractFileByPath(sourcePath);
+  if (!(file instanceof TFile)) {
+    return;
+  }
+  if (!oldLine || !newLine || oldLine === newLine) {
+    return;
+  }
+  await atomicModify(app, file, (data) => {
+    const idx = data.indexOf(oldLine);
+    if (idx === -1) {
+      return data;
+    }
+    return data.substring(0, idx) + newLine + data.substring(idx + oldLine.length);
+  });
+}

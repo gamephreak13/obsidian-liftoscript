@@ -2,7 +2,7 @@ import { Notice, Platform, Plugin, TFile, requestUrl, setIcon } from "obsidian";
 import { setCustomExercises, setActiveDatabase, setFreeRemoteExercises } from "./exerciseDb";
 import { ExerciseSuggest } from "./exerciseSuggest";
 import { registerLiftoscriptPostProcessor, RenderCallbacks } from "./liftoscriptRender";
-import { syncSetCompletion } from "./setCompletion";
+import { syncSetCompletion, syncLineEdit } from "./setCompletion";
 import { updateWorkoutFrontmatter } from "./frontmatter";
 import { buildNextWorkoutContent } from "./nextWorkout";
 import { formatTemplateDate, formatTemplateTime, renderTemplate } from "./template";
@@ -57,6 +57,14 @@ export default class LiftoscriptPlugin extends Plugin {
 						console.error("Liftoscript: failed to sync set completion", e);
 					}
 				);
+			},
+			onEditLine: (oldLine, newLine, sourcePath) => {
+				syncLineEdit(this.app, sourcePath, oldLine, newLine)
+					.then(() => new Notice("Exercise updated."))
+					.catch((e) => {
+						console.error("Liftoscript: failed to edit exercise line", e);
+						new Notice("Liftoscript: failed to update the exercise.");
+					});
 			},
 		};
 

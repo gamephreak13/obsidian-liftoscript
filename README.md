@@ -30,6 +30,9 @@ An [Obsidian](https://obsidian.md) plugin that integrates **Liftoscript** — th
 | Checkboxes persisted back into the raw markdown | `setCompletion.ts` |
 | Exercise autocomplete in the editor | `exerciseDb.ts` |
 | Stretch exercises: timed sets + auto countdown (no weight/progression) | `parser.ts` / `liftoscriptRender.ts` |
+| Bodyweight sets (`5xbw`, `5xbw+25lb`, `5xbw-10kg`) + volume using a default body weight | `parser.ts` / `summary.ts` / `settings.ts` |
+| Free Exercise DB info modal (equipment, muscles, instructions, images) | `exerciseInfoModal.ts` |
+| Edit a rendered card's line (correct reps/weight of a set) | `editLineModal.ts` / `setCompletion.ts` |
 | Session summarization (volume, sets, duration) | `summary.ts` |
 | YAML frontmatter metric injection | `frontmatter.ts` |
 | `lp()` progressive overload | `progression.ts` / `parser.ts` |
@@ -70,6 +73,29 @@ Breaking that down:
 ```
 ````
 
+### Bodyweight exercises
+
+Use `bw` in place of a weight to log an exercise done against your body weight. An
+optional `+`/`-` load lets you note added (weighted) or subtracted (assisted) load:
+
+| Token | Meaning |
+| --- | --- |
+| `5xbw` | 5 reps at body weight |
+| `5xbw+25lb` | 5 reps body weight **+25 lb** (weighted / dip belt / vest) |
+| `5xbw-10kg` | 5 reps body weight **−10 kg** (assisted / machine counterweight) |
+
+```liftoscript
+[ ] [ ] [ ] Pull-Up / 5xbw, 5xbw+25lb, 5xbw-10kg
+[ ] [ ] [ ] Push-Up / 10xbw, rest: 60
+```
+
+These render as `5 reps @ BW`, `5 reps @ BW +25lb`, and `5 reps @ BW -10kg` on the card.
+
+Bodyweight volume uses your **Default body weight** setting
+(Settings → Liftoscript → Default body weight) plus the added load:
+`total_volume += (body_weight + added_weight) × reps`. For example, with a default
+body weight of `160lb`, `5xbw+25lb` contributes `(160 + 25) × 5 = 925 lb`.
+
 ---
 
 ## In the Editor (Reading View)
@@ -79,6 +105,8 @@ Open a note containing a ````liftoscript```` block in **Reading** view. Each exe
 - **One checkbox per set** — ticking it checks off the set and writes `[x]` back into the note's source.
 - **"Start rest" button** — begins an in-memory countdown shown next to it. When it hits `0:00` you get an Obsidian **Notice** plus a **short alert chime**.
 - Ticking **every** set of an exercise marks it complete (used for progression & metrics).
+- **ℹ️ info button** (top-right of the card header) — when an exercise matches the active **Free Exercise DB**, a small info button appears. Tapping it opens a modal with the exercise's equipment, primary/secondary muscles, step-by-step instructions, an image carousel, and a link to the source on GitHub.
+- **✎ edit button** (top-right of the card header) — opens the card's raw liftoscript line for editing. Every card shows it, so if you complete a set with different reps or weight than planned (e.g. an AMRAP or a failed top set), you can correct it on the spot. Save rewrites the line back into the note's source. Same format rules as the [Exercise Line Syntax](#the-exercise-line-syntax): one `NxW` token per set, markers first.
 
 > The timer runs **only in memory** — it never rewrites the file every second — so it won't flood real-time sync (LiveSync) or Obsidian Git with changes.
 
@@ -87,6 +115,26 @@ Open a note containing a ````liftoscript```` block in **Reading** view. Each exe
 ## Autocomplete
 
 While editing a note, type an exercise name after a `/` or list marker (`-`, `*`, `+`), or at the start of a line. A dropdown of exercise names from the **active database** appears; pick one to insert it. Choose between the **Native Liftosaur** database (227 entries) and the **Free Exercise DB** (876 entries) in Settings → Exercise database. With the Free Exercise DB active you can also search by muscle group or equipment (e.g. typing `chest` or `barbell`).
+
+---
+
+## Settings
+
+Everything lives under **Settings → Liftoscript**:
+
+| Setting | What it does |
+| --- | --- |
+| **Workout folder** | Directory where **Generate Next Workout** writes files (created automatically if missing). Empty = same folder as the active note. |
+| **Default body weight** | Body weight used to compute bodyweight-set volume. |
+| **Append inline to daily note** | Append the generated workout to the active daily note instead of a separate file. |
+| **Active exercise database** | Choose **Native Liftosaur** (227) or **Free Exercise DB** (876) for autocomplete + card info. |
+| **Free Exercise DB remote URL** / **Refresh remote database** | Point at a custom Free Exercise DB JSON and refresh the bundled copy. |
+| **Custom exercise database** | Path to a JSON file to override/merge the active database (applied on save). |
+| **Generate example note** | Create or refresh `Liftosaur-Example.md`, a fully worked example showing the checklist, stretch holds, bodyweight sets, Dataview metrics and quick-add buttons. |
+| **Floating action button** / **Restrict FAB to folders** / **FAB folders** | Toggle an on-canvas button that appends a quick-add exercise; optionally restrict it to specific folders. |
+| **Quick-add exercise templates** | Define snippet templates behind the `Liftoscript: Add <exercise>` commands. |
+| **Frontmatter template** | Custom YAML template for the metrics written by **Update workout metrics**. |
+| **Workout filename template** | Output filename convention, e.g. `{{workout_name}}-{{date}}`. |
 
 ---
 
@@ -108,7 +156,7 @@ session_duration_seconds: 970
 last_updated: 2026-08-30T21:49:03.363Z
 ```
 
-- `total_volume` = sum of (weight × reps) over **completed** sets only.
+- `total_volume` = sum of (weight × reps) over **completed** sets only. For bodyweight sets this is `(default body weight + added load) × reps` (see [Bodyweight exercises](#bodyweight-exercises)).
 - `session_duration` = an **estimate**: for each completed set we add the exercise's `rest` seconds plus ~40 s of work time.
 - Numbers are rounded; units default to `lb` if a block has no unit.
 
@@ -158,7 +206,8 @@ FROM #workout
 
 **Command Palette → Liftoscript: Generate Next Workout**
 
-Creates a **new markdown file** in the same folder as the active note and opens it. It:
+Creates a **new markdown file** — in the **Workout folder** set in Settings →
+Liftoscript (falls back to the active note's folder when left empty) — and opens it. It:
 
 1. Reads the active note's ````liftoscript```` blocks.
 2. For each line with a `progress: lp(...)` tag, applies progressive overload (see below).
@@ -168,7 +217,7 @@ Creates a **new markdown file** in the same folder as the active note and opens 
 
 Example generated file:
 
-```markdown
+````markdown
 ---
 date: 2026-08-30
 total_volume: 0
@@ -186,9 +235,9 @@ previous_workout: [[Workout-2026-08-29]]
 [ ] [ ] [ ] [ ] [ ] Bench Press / 5x105lb, 5x105lb, 5x105lb, 5x105lb, 5x105lb, rest: 90, progress: lp(5lb, 1, 0)
 [ ] [ ] [ ] [ ] Deadlift / 5x200lb, 5x200lb, 5x200lb, 5x200lb, rest: 120
 ```
-```
+````
 
-> New files are named `<PreviousBaseName>-<YYYY-MM-DD>.md` (a `-2`, `-3` suffix is added if the name already exists).
+> New files are named `<PreviousBaseName>-<YYYY-MM-DD>.md` (a `-2`, `-3` suffix is added if the name already exists). If the configured **Workout folder** (including nested parents) doesn't exist yet, the plugin creates it automatically before writing — so a fresh vault or newly-set folder path never fails the write.
 
 ---
 
@@ -268,6 +317,7 @@ type: workout
 [x] [x] [x] [x] [x] Bench Press / 5x100lb, 5x100lb, 5x100lb, 5x100lb, 5x100lb, rest: 90, progress: lp(5lb, 1, 0)
 [x] [x] [x] OHP / 8x42.5kg, 8x42.5kg, 8x42.5kg, rest: 120, progress: lp(2.5kg, 2, 0)
 [x] [x] [ ] [x] [ ] Dips / 10x0lb, 10x0lb, 10x0lb, 10x0lb, 10x0lb, rest: 60
+[x] [ ] [ ] Pull-Up / 5xbw, 5xbw+25lb, 5xbw-10kg
 ```
 
 After this session:

@@ -36,6 +36,43 @@
   color: var(--interactive-accent);
 }
 
+.liftoscript-exercise-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.liftoscript-exercise-edit {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+}
+
+.liftoscript-exercise-edit:hover {
+  color: var(--interactive-accent);
+}
+
+/* P31: edit-line modal */
+
+.liftoscript-edit-modal .liftoscript-edit-line {
+  width: 100%;
+  min-height: 5rem;
+  font-family: var(--font-monospace);
+  font-size: 0.95rem;
+  resize: vertical;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
 .liftoscript-sets {
   display: flex;
   flex-direction: column;

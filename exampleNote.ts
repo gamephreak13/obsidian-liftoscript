@@ -41,7 +41,9 @@ last_updated: 2026-08-30T00:00:00.000Z
 
 Welcome! This note shows what the **Liftoscript** plugin does. Tick a checkbox
 to persist it to the file, hit **Start rest** on a strength set for a countdown,
-and watch stretch holds count down automatically. Then run **Update workout
+watch stretch holds count down automatically, tap the ℹ️ button on a strength
+card to see its equipment, muscles, and instructions from the Free Exercise DB,
+or use the ✎ button to correct a set's reps/weight. Then run **Update workout
 metrics** and **Generate Next Workout** from the command palette.
 
 ## Strength
@@ -50,6 +52,7 @@ metrics** and **Generate Next Workout** from the command palette.
 [x] [x] [ ] [ ] [x] Bench Press / 5x100lb, 5x100lb, 5x100lb, 5x100lb, 5x100lb, rest: 90, progress: lp(5lb, 1, 0)
 [x] [x] [x] Squat / 5x200lb, 5x200lb, 5x200lb, rest: 120, progress: lp(5lb, 1, 0)
 [ ] [ ] [ ] Deadlift / 3x225lb, 3x225lb, 3x225lb, rest: 150
+[ ] [ ] [ ] Pull-Up / 5xbw, 5xbw+25lb, 5xbw-10kg
 \`\`\`
 
 ## Stretch
