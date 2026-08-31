@@ -139,3 +139,34 @@
   min-height: 2.75rem;
   font-size: 1.05rem;
 }
+
+/* P15: floating action button */
+
+.liftoscript-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: var(--layer-popover);
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.liftoscript-fab svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.liftoscript-fab:active {
+  transform: scale(0.94);
+}

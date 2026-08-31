@@ -15,13 +15,69 @@ export interface LiftoscriptSettings {
   workoutFolder: string;
   appendToDailyNote: boolean;
   customExerciseDb: string;
+  fabMode: "mobile" | "desktop" | "both";
+  fabRestrictToFolders: boolean;
+  fabFolders: string[];
 }
 
 export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   workoutFolder: "",
   appendToDailyNote: false,
   customExerciseDb: "",
+  fabMode: "mobile",
+  fabRestrictToFolders: false,
+  fabFolders: [],
 };
+
+/** Whether the FAB should render on the current platform for the given mode. */
+export function fabVisibleForMode(mode: LiftoscriptSettings["fabMode"], isMobile: boolean): boolean {
+  if (mode === "both") {
+    return true;
+  }
+  if (mode === "mobile") {
+    return isMobile;
+  }
+  if (mode === "desktop") {
+    return !isMobile;
+  }
+  return false;
+}
+
+export function isInRestrictedFolders(
+  notePath: string,
+  folders: string[]
+): boolean {
+  if (!folders || folders.length === 0) {
+    return true;
+  }
+  const normalized = normalizePath(notePath || "")
+    .replace(/\/+$/, "")
+    .split("/");
+  for (const raw of folders) {
+    const folder = normalizePath((raw || "").trim())
+      .replace(/^\/+|\/+$/g, "")
+      .split("/")
+      .filter(Boolean);
+    if (folder.length === 0) {
+      return true;
+    }
+    let match = true;
+    if (folder.length > normalized.length) {
+      match = false;
+    } else {
+      for (let i = 0; i < folder.length; i++) {
+        if (folder[i].toLowerCase() !== normalized[i].toLowerCase()) {
+          match = false;
+          break;
+        }
+      }
+    }
+    if (match) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Normalize a configured folder to a vault-relative path ("" == vault root). */
 export function resolveFolder(folder: string): string {
@@ -137,6 +193,54 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
       "Load and merge the configured custom exercise database now."
     ).addButton((button) =>
       button.setButtonText("Apply").setCta().onClick(() => this.onApplyCustom())
+    );
+
+    containerEl.createEl("h3", { text: "Quick entry" });
+
+    new Setting(containerEl).setName("Floating action button").setDesc(
+      "A quick-entry FAB that opens the Log exercise modal. Choose which " +
+        "platforms should show it."
+    ).addDropdown((dd) => {
+      dd.addOption("mobile", "Mobile Only");
+      dd.addOption("desktop", "Desktop Only");
+      dd.addOption("both", "Both");
+      dd.setValue(settings.fabMode);
+      dd.onChange(async (value) => {
+        const v = value as LiftoscriptSettings["fabMode"];
+        const plugin = this.plugin();
+        plugin.settings.fabMode = v;
+        await plugin.saveSettings();
+      });
+    });
+
+    new Setting(containerEl).setName("Restrict FAB to folders").setDesc(
+      "When enabled, the FAB only appears while a note inside one of the " +
+        "listed folders is active."
+    ).addToggle((toggle) =>
+      toggle
+        .setValue(settings.fabRestrictToFolders)
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.fabRestrictToFolders = value;
+          await plugin.saveSettings();
+        })
+    );
+
+    new Setting(containerEl).setName("FAB folders").setDesc(
+      "One folder path per line (vault-relative). Leave empty to allow the FAB " +
+        "in every folder. Nested folders are included."
+    ).addTextArea((area) =>
+      area
+        .setPlaceholder("Fitness\nWorkouts")
+        .setValue(settings.fabFolders.join("\n"))
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.fabFolders = value
+            .split("\n")
+            .map((p) => p.trim())
+            .filter(Boolean);
+          await plugin.saveSettings();
+        })
     );
   }
 }

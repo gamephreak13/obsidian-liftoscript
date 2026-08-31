@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile } from "obsidian";
+import { Notice, Platform, Plugin, TFile, setIcon } from "obsidian";
 import { ExerciseSuggest, setCustomExercises } from "./exerciseDb";
 import { registerLiftoscriptPostProcessor, RenderCallbacks } from "./liftoscriptRender";
 import { syncSetCompletion } from "./setCompletion";
@@ -6,6 +6,8 @@ import { updateWorkoutFrontmatter } from "./frontmatter";
 import { buildNextWorkoutContent } from "./nextWorkout";
 import {
 	DEFAULT_SETTINGS,
+	fabVisibleForMode,
+	isInRestrictedFolders,
 	LiftoscriptSettingTab,
 	LiftoscriptSettings,
 	parseCustomExercises,
@@ -17,6 +19,7 @@ import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 
 export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
+	private fabEl: HTMLElement | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -37,6 +40,8 @@ export default class LiftoscriptPlugin extends Plugin {
 		};
 
 		registerLiftoscriptPostProcessor(this, callbacks);
+
+		this.registerEvent(this.app.workspace.on("file-open", () => this.refreshFAB()));
 
 		this.addCommand({
 			id: "update-workout-metrics",
@@ -160,10 +165,68 @@ export default class LiftoscriptPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.refreshFAB();
 	}
 
 	private async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.refreshFAB();
+	}
+
+	private openLogModal() {
+		const file = this.app.workspace.getActiveFile();
+		if (!(file instanceof TFile)) {
+			new Notice("Open a note to log an exercise.");
+			return;
+		}
+		const modal = new LogExerciseModal(this.app, {
+			onSubmit: async (result) => {
+				await this.appendExerciseLine(file, result.line);
+			},
+		});
+		modal.open();
+	}
+
+	/**
+	 * P15: render a floating action button on the workspace container when the
+	 * configured fabMode matches the current platform. Tap opens the log modal.
+	 */
+	private refreshFAB() {
+		const target = this.app.workspace.containerEl;
+		const visible =
+			fabVisibleForMode(this.settings.fabMode, Platform.isMobile) &&
+			this.fabAllowedInActiveNote();
+
+		this.fabEl?.remove();
+		this.fabEl = null;
+		if (!visible) {
+			return;
+		}
+
+		const fab = document.createElement("button");
+		fab.type = "button";
+		fab.className = "liftoscript-fab";
+		fab.setAttribute("aria-label", "Log exercise");
+		setIcon(fab, "dumbbell");
+		fab.addEventListener("click", () => this.openLogModal());
+		target.appendChild(fab);
+		this.fabEl = fab;
+	}
+
+	private fabAllowedInActiveNote(): boolean {
+		if (!this.settings.fabRestrictToFolders) {
+			return true;
+		}
+		const file = this.app.workspace.getActiveFile();
+		if (!(file instanceof TFile)) {
+			return false;
+		}
+		return isInRestrictedFolders(file.path, this.settings.fabFolders);
+	}
+
+	onunload() {
+		this.fabEl?.remove();
+		this.fabEl = null;
 	}
 
 	/** Load + merge the configured custom exercise database (P18 option 3). */
@@ -187,7 +250,5 @@ export default class LiftoscriptPlugin extends Plugin {
 			new Notice(`Failed to apply custom database: ${(e as Error).message}`);
 		}
 	}
-
-	onunload() {}
 }
 
