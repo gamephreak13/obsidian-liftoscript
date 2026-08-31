@@ -105,12 +105,44 @@ an estimated duration from the completed sets above:
 - `session_duration` / `session_duration_seconds` (~40 s work + rest per set)
 - `last_updated`
 
-These keys are Dataview-friendly. Example query:
+These keys are Dataview-friendly. Example queries (this note is tagged
+`type: workout` in its frontmatter, so `#workout` matches it — adjust to your
+own tag or folder):
+
+**Every workout log, newest first:**
 
 ```dataview
-TABLE total_volume, completed_sets, session_duration
-FROM "Workouts"
+TABLE date, total_volume, completed_sets + "/" + total_sets AS "Sets", total_reps, session_duration
+FROM #workout
+SORT date DESC
 ```
+
+**The last seven days only:**
+
+```dataview
+TABLE total_volume, session_duration
+FROM #workout
+WHERE date >= date(today) - dur(7 days)
+SORT date DESC
+```
+
+**Session completeness, as a percentage:**
+
+```dataview
+TABLE completed_sets + "/" + total_sets AS "Sets done", round(100 * completed_sets / total_sets) AS "% complete"
+FROM #workout
+WHERE total_sets > 0
+```
+
+**A calendar view of your training days:**
+
+```dataview
+CALENDAR date
+FROM #workout
+```
+
+> Using `FROM "Workouts"` (a folder) or `FROM #workout` (a tag) both work —
+> pick whichever your vault uses.
 
 ---
 

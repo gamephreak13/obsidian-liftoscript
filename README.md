@@ -112,12 +112,45 @@ last_updated: 2026-08-30T21:49:03.363Z
 - `session_duration` = an **estimate**: for each completed set we add the exercise's `rest` seconds plus ~40 s of work time.
 - Numbers are rounded; units default to `lb` if a block has no unit.
 
-These keys are queryable directly from the **Dataview** plugin, e.g.:
+These keys are queryable directly from the **Dataview** plugin. A few example
+queries (given each workout note is tagged `type: workout`, e.g. via frontmatter
+`type: workout`):
+
+**A log of every workout, newest first** — volume, sets, reps and duration:
 
 ```dataview
-TABLE total_volume, completed_sets, session_duration
-FROM "Workouts"
+TABLE date, total_volume, completed_sets + "/" + total_sets AS "Sets", total_reps, session_duration
+FROM #workout
+SORT date DESC
 ```
+
+**The last seven days** — which days you trained and how long:
+
+```dataview
+TABLE total_volume, session_duration
+FROM #workout
+WHERE date >= date(today) - dur(7 days)
+SORT date DESC
+```
+
+**Session completeness** — a percentage of sets actually completed:
+
+```dataview
+TABLE completed_sets + "/" + total_sets AS "Sets done", round(100 * completed_sets / total_sets) AS "% complete"
+FROM #workout
+WHERE total_sets > 0
+```
+
+**A calendar view of your training days** (Dataview's `CALENDAR`):
+
+```dataview
+CALENDAR date
+FROM #workout
+```
+
+> Swap `#workout` for whatever tag or folder you use, e.g. `FROM "Workouts"` or
+> `FROM "Workouts" AND #upper`. If you track volume trend, note that
+> `session_duration` is an estimate (rest + ~40 s of work per completed set).
 
 ---
 

@@ -59,6 +59,30 @@ metrics** and **Generate Next Workout** from the command palette.
 [ ] [ ] Standing Quad Stretch / 2x45s|30s
 \`\`\`
 
+## Dataview
+
+The frontmatter above holds the metrics this plugin writes. Once you run
+**Update workout metrics**, those keys are queryable from the
+[Dataview](https://blacksmithgu.github.io/obsidian-dataview/) plugin. Example
+queries (this note is tagged \`type: workout\`, so \`#workout\` matches it):
+
+\`\`\`dataview
+TABLE date, total_volume, completed_sets + "/" + total_sets AS "Sets", total_reps, session_duration
+FROM #workout
+SORT date DESC
+\`\`\`
+
+\`\`\`dataview
+TABLE completed_sets + "/" + total_sets AS "Sets done", round(100 * completed_sets / total_sets) AS "% complete"
+FROM #workout
+WHERE total_sets > 0
+\`\`\`
+
+\`\`\`dataview
+CALENDAR date
+FROM #workout
+\`\`\`
+
 ## Quick add
 
 Tapping a button below runs the matching **Liftoscript: Add <exercise>**
