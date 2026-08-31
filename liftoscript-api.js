@@ -1243,13 +1243,21 @@ function weightOperation(weight, value, o) {
     throw new Error("Weight.operation should never work with numbers only");
   }
 }
+function findSpecDelimiter(s) {
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "/" && i > 0 && /\s/.test(s[i - 1])) {
+      return i;
+    }
+  }
+  return -1;
+}
 function parseExerciseLine(line, setStart = 1) {
   const trimmed = line.trim();
   const lineOffset = line.indexOf(trimmed);
   let cursor = 0;
   const markers = [];
   const markerRe = /\[([ xX])\]/g;
-  const dashIndexOriginal = trimmed.indexOf("/");
+  const dashIndexOriginal = findSpecDelimiter(trimmed);
   const markerZone = dashIndexOriginal === -1 ? trimmed : trimmed.substring(0, dashIndexOriginal);
   let mm;
   let markerEndOffset = 0;
@@ -1266,7 +1274,7 @@ function parseExerciseLine(line, setStart = 1) {
   const specTrim = rawSpec.replace(/^\s*/, "");
   const specStart = rawSpecStart + (rawSpec.length - specTrim.length);
   const spec = specTrim;
-  const dashIndex = spec.indexOf("/");
+  const dashIndex = findSpecDelimiter(spec);
   const name = (dashIndex === -1 ? spec : spec.substring(0, dashIndex)).trim();
   const rest = dashIndex === -1 ? "" : spec.substring(dashIndex + 1);
   const restMatch = rest.match(/rest\s*:\s*(\d+)/i);
@@ -1296,7 +1304,10 @@ function parseExerciseLine(line, setStart = 1) {
       }
     }
   }
-  const isStretch = STRETCH_TAG_RE.test(spec) || isStretchExerciseName(name);
+  const stretchByTag = STRETCH_TAG_RE.test(spec);
+  const stretchByDb = isStretchExerciseName(name);
+  const stretchByContent = /\d+(?:\.\d+)?s\b/i.test(rest);
+  const isStretch = stretchByTag || stretchByDb || stretchByContent;
   const sets = [];
   let setNumber = setStart;
   if (isStretch) {

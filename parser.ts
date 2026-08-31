@@ -1778,6 +1778,23 @@ const SET_RE =
   /^\s*(\d+)x(\d+)\s*(?:\|\s*(?:(\d+(?:\.\d+)?)\s*(lb|kg)))?\s*([^,|]*)?\s*(?:amount\s*:\s*(\d+))?\s*(?:,\s*(\d+)\s*(?:m|s|:))?/i;
 
 /**
+ * Find the index of the "/" that separates an exercise name from its set spec.
+ * Exercise names may themselves contain slashes (e.g. "3/4 Sit-Up"), so the
+ * separator is the first slash preceded by whitespace (the liftoscript
+ * "Name / spec" convention). Returns -1 when no such slash exists — the whole
+ * string is treated as the name (a lone "/" with no surrounding space is part
+ * of the name).
+ */
+function findSpecDelimiter(s: string): number {
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "/" && i > 0 && /\s/.test(s[i - 1])) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
  * Parse a single liftoscript exercise line.
  *
  * Supporting format:
@@ -1796,7 +1813,7 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
   const markers: { start: number; end: number; completed: boolean }[] = [];
   const markerRe = /\[([ xX])\]/g;
   // only consume markers before the first "/"
-  const dashIndexOriginal = trimmed.indexOf("/");
+  const dashIndexOriginal = findSpecDelimiter(trimmed);
   const markerZone = dashIndexOriginal === -1 ? trimmed : trimmed.substring(0, dashIndexOriginal);
   let mm: RegExpExecArray | null;
   let markerEndOffset = 0;
@@ -1817,7 +1834,7 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
   const specStart = rawSpecStart + (rawSpec.length - specTrim.length);
   const spec = specTrim;
 
-  const dashIndex = spec.indexOf("/");
+  const dashIndex = findSpecDelimiter(spec);
   const name = (dashIndex === -1 ? spec : spec.substring(0, dashIndex)).trim();
   const rest = dashIndex === -1 ? "" : spec.substring(dashIndex + 1);
 
@@ -1851,9 +1868,15 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
     }
   }
 
-  // Stretch exercises are categorized via a "type: stretch" tag on the line or
-  // via a "stretch" entry in the exercise database.
-  const isStretch = STRETCH_TAG_RE.test(spec) || isStretchExerciseName(name);
+  // A line is a stretch (timed hold) when it carries a "type: stretch" tag, or
+  // the name matches a stretch entry in the active database, OR (crucially for
+  // freeform notes) the spec itself contains time tokens like "3x60s" / "45s|15s".
+  // This lets exercises that aren't in the DB still render hold-timer checkboxes
+  // when a time is associated, while weight (lb/kg) lines stay strength checks.
+  const stretchByTag = STRETCH_TAG_RE.test(spec);
+  const stretchByDb = isStretchExerciseName(name);
+  const stretchByContent = /\d+(?:\.\d+)?s\b/i.test(rest);
+  const isStretch = stretchByTag || stretchByDb || stretchByContent;
 
   // Parse set tokens. Strength lines use "5x100lb" style tokens, where each
   // token is ONE set of <reps>x<weight>. Stretch lines use time-based specs

@@ -172,11 +172,26 @@ export function setCustomExercises(custom: Array<Record<string, unknown>>): void
 
 /** Find an exercise by its (case-insensitive) name in the active dataset. */
 export function findExercise(raw: string): Exercise | undefined {
-  const name = raw
-    .split("/")[0]
-    .trim()
-    .replace(/^[-+*]\s*/, "");
-  return getExercises().find((e) => e.name.toLowerCase() === name.toLowerCase());
+  return getExercises().find(
+    (e) => e.name.toLowerCase() === exerciseNameFromLine(raw).toLowerCase()
+  );
+}
+
+/**
+ * Extract the exercise name from a liftoscript line. Names may contain slashes
+ * (e.g. "3/4 Sit-Up"), so the split point is the first slash preceded by
+ * whitespace — the "Name / spec" separator. With no such slash the whole string
+ * is the name (a slash without surrounding spaces is part of the name).
+ */
+export function exerciseNameFromLine(line: string): string {
+  const trimmed = line.trim();
+  const afterMarkers = trimmed.replace(/^(\[[ xX]\]\s*)+/, "").trim();
+  for (let i = 1; i < afterMarkers.length; i++) {
+    if (afterMarkers[i] === "/" && /\s/.test(afterMarkers[i - 1])) {
+      return afterMarkers.substring(0, i).trim();
+    }
+  }
+  return afterMarkers;
 }
 
 /** True when the given exercise name is a stretch in the active dataset. */

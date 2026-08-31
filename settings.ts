@@ -1,5 +1,8 @@
 import { App, normalizePath, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
 import { DATABASE_LABELS, DatabaseId } from "./exerciseDb";
+// Re-export the shared name extractor (defined in the pure exerciseDb module)
+// so existing importers keep using "./settings".
+export { exerciseNameFromLine } from "./exerciseDb";
 
 /*
  * settings.ts
@@ -135,12 +138,6 @@ export function resolveFolder(folder: string): string {
     return "";
   }
   return p.replace(/^\/+/, "").replace(/\/+$/, "");
-}
-
-export function exerciseNameFromLine(line: string): string {
-  const trimmed = line.trim();
-  const afterMarkers = trimmed.replace(/^(\[[ xX]\]\s*)+/, "").trim();
-  return afterMarkers.split("/")[0].trim();
 }
 
 /**
