@@ -18,6 +18,7 @@ export interface LiftoscriptSettings {
   fabMode: "mobile" | "desktop" | "both";
   fabRestrictToFolders: boolean;
   fabFolders: string[];
+  buttonTemplates: string[];
 }
 
 export const DEFAULT_SETTINGS: LiftoscriptSettings = {
@@ -27,6 +28,13 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   fabMode: "mobile",
   fabRestrictToFolders: false,
   fabFolders: [],
+  buttonTemplates: [
+    "[ ] [ ] [ ] Squat / 5x200lb, 5x200lb, 5x200lb, rest: 120",
+    "[ ] [ ] [ ] Bench Press / 5x100lb, 5x100lb, 5x100lb, rest: 90",
+    "[ ] [ ] [ ] Deadlift / 5x200lb, 5x200lb, 5x200lb, rest: 120",
+    "[ ] [ ] [ ] Overhead Press / 5x65lb, 5x65lb, 5x65lb, rest: 90",
+    "[ ] [ ] [ ] Hamstring Stretch / 3x60s",
+  ],
 };
 
 /** Whether the FAB should render on the current platform for the given mode. */
@@ -86,6 +94,12 @@ export function resolveFolder(folder: string): string {
     return "";
   }
   return p.replace(/^\/+/, "").replace(/\/+$/, "");
+}
+
+export function exerciseNameFromLine(line: string): string {
+  const trimmed = line.trim();
+  const afterMarkers = trimmed.replace(/^(\[[ xX]\]\s*)+/, "").trim();
+  return afterMarkers.split("/")[0].trim();
 }
 
 /**
@@ -238,6 +252,26 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
           plugin.settings.fabFolders = value
             .split("\n")
             .map((p) => p.trim())
+            .filter(Boolean);
+          await plugin.saveSettings();
+        })
+    );
+
+    containerEl.createEl("h3", { text: "Buttons integration" });
+
+    new Setting(containerEl).setName("Quick-add exercise templates").setDesc(
+      "One liftoscript line per template. Each becomes a command named " +
+        "\"Liftoscript: Add <exercise>\", which Buttons buttons can invoke via " +
+        "type command action. Changes apply after a plugin reload."
+    ).addTextArea((area) =>
+      area
+        .setPlaceholder("[ ] [ ] [ ] Squat / 5x200lb, rest: 120")
+        .setValue(settings.buttonTemplates.join("\n"))
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.buttonTemplates = value
+            .split("\n")
+            .map((line) => line.trim())
             .filter(Boolean);
           await plugin.saveSettings();
         })

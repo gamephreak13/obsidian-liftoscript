@@ -6,6 +6,7 @@ import { updateWorkoutFrontmatter } from "./frontmatter";
 import { buildNextWorkoutContent } from "./nextWorkout";
 import {
 	DEFAULT_SETTINGS,
+	exerciseNameFromLine,
 	fabVisibleForMode,
 	isInRestrictedFolders,
 	LiftoscriptSettingTab,
@@ -20,12 +21,15 @@ import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
 	private fabEl: HTMLElement | null = null;
+	private buttonCommandIds: string[] = [];
 
 	async onload() {
 		await this.loadSettings();
 		this.addSettingTab(new LiftoscriptSettingTab(this.app, this, () => {
 			void this.applyCustomExercises();
 		}));
+
+		this.registerButtonCommands();
 
 		this.registerEditorSuggest(new ExerciseSuggest(this.app));
 
@@ -166,6 +170,7 @@ export default class LiftoscriptPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.refreshFAB();
+		this.registerButtonCommands();
 	}
 
 	private async loadSettings() {
@@ -224,9 +229,45 @@ export default class LiftoscriptPlugin extends Plugin {
 		return isInRestrictedFolders(file.path, this.settings.fabFolders);
 	}
 
+	private registerButtonCommands() {
+		for (const id of this.buttonCommandIds) {
+			this.removeCommand(id);
+		}
+		this.buttonCommandIds = [];
+
+		const seen = new Set<string>();
+		for (const line of this.settings.buttonTemplates) {
+			const name = exerciseNameFromLine(line);
+			if (!name || seen.has(name.toLowerCase())) {
+				continue;
+			}
+			seen.add(name.toLowerCase());
+			const id = `liftoscript-add-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+			this.addCommand({
+				id,
+				name: `Add ${name}`,
+				checkCallback: (checking) => {
+					const file = this.app.workspace.getActiveFile();
+					if (!(file instanceof TFile)) {
+						return false;
+					}
+					if (!checking) {
+						void this.appendExerciseLine(file, line);
+					}
+					return true;
+				},
+			});
+			this.buttonCommandIds.push(id);
+		}
+	}
+
 	onunload() {
 		this.fabEl?.remove();
 		this.fabEl = null;
+		for (const id of this.buttonCommandIds) {
+			this.removeCommand(id);
+		}
+		this.buttonCommandIds = [];
 	}
 
 	/** Load + merge the configured custom exercise database (P18 option 3). */
