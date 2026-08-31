@@ -1757,6 +1757,11 @@ export interface ParsedExerciseSet {
   seconds?: number;
   /** Per-set rest in seconds after the hold, from "H|R" stretch syntax. */
   restSeconds?: number;
+  /** True for a bodyweight notation set (e.g. "5xbw", "5xbw+25lb"). */
+  isBodyweight?: boolean;
+  /** Signed added (positive) or subtracted/assisted (negative) weight for a
+   *  bodyweight set. Zero when the token was a plain "Nxbw". */
+  addedWeight?: IWeight;
 }
 
 export interface ParsedExercise {
@@ -1910,22 +1915,45 @@ export function parseExerciseLine(line: string, setStart = 1): ParsedExercise {
   }
 
   if (sets.length === 0) {
-    const setTokenRe = /(\d+)x(\d+(?:\.\d+)?)\s*(lb|kg)/g;
+    // Strength set tokens. Two forms:
+    //   "5x100lb"            standard weighted set (reps x weight)
+    //   "5xbw", "5xbw+25lb", "5xbw-10lb"   bodyweight set with an optional
+    //                         signed added (weighted) / subtracted (assisted) load.
+    // Groups: 1 reps, 2 weight value, 3 unit, 4 "bw", 5 sign, 6 added value, 7 added unit.
+    const setTokenRe = /(\d+)x(?:(?:(\d+(?:\.\d+)?)\s*(lb|kg))|(bw)(?:\s*([-+])\s*(\d+(?:\.\d+)?)\s*(lb|kg))?)/gi;
     let m: RegExpExecArray | null;
     while ((m = setTokenRe.exec(rest))) {
       const reps = parseInt(m[1], 10);
-      const weightValue = parseFloat(m[2]);
-      const unit = m[3] as Unit;
       const marker = markers[sets.length];
-      sets.push({
-        setNumber,
-        weight: weightBuild(weightValue, unit),
-        reps,
-        isAmrap: false,
-        completed: marker ? marker.completed : false,
-        markerStart: marker?.start,
-        markerEnd: marker?.end,
-      });
+      if (m[4] === "bw") {
+        const sign = m[5];
+        const addedValue = m[6] ? parseFloat(m[6]) : 0;
+        const unit = (m[7] as Unit) ?? DEFAULT_UNIT;
+        const signed = sign === "-" ? -addedValue : addedValue;
+        sets.push({
+          setNumber,
+          weight: weightBuild(signed, unit),
+          reps,
+          isAmrap: false,
+          completed: marker ? marker.completed : false,
+          markerStart: marker?.start,
+          markerEnd: marker?.end,
+          isBodyweight: true,
+          addedWeight: weightBuild(signed, unit),
+        });
+      } else {
+        const weightValue = parseFloat(m[2]);
+        const unit = m[3] as Unit;
+        sets.push({
+          setNumber,
+          weight: weightBuild(weightValue, unit),
+          reps,
+          isAmrap: false,
+          completed: marker ? marker.completed : false,
+          markerStart: marker?.start,
+          markerEnd: marker?.end,
+        });
+      }
       setNumber += 1;
     }
   }

@@ -3,6 +3,8 @@ import { parseExerciseLine, ParsedExercise, ParsedExerciseSet, weightPrint } fro
 import { startRest, stopRest } from "./restTimer";
 import { notifyRestComplete } from "./notify";
 import { startStretchHold, attachStretchTimer, stopStretchTimer, StretchTick } from "./stretchTimer";
+import { findExercise, hasExerciseInfo } from "./exerciseDb";
+import { ExerciseInfoModal } from "./exerciseInfoModal";
 
 /*
  * liftoscriptRender.ts
@@ -37,8 +39,24 @@ function renderSeconds(seconds: number): string {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
+/** Format a set's weight label. Bodyweight sets show a "BW" tag plus any
+ *  added (weighted) or subtracted (assisted) load, e.g. "BW +25lb". */
+function setLabel(set: ParsedExerciseSet): string {
+  if (set.isBodyweight) {
+    const added = set.addedWeight;
+    if (added && added.value !== 0) {
+      const sign = added.value > 0 ? "+" : "-";
+      const v = Math.round(Math.abs(added.value) * 1e2) / 1e2;
+      return `${set.reps} reps @ BW ${sign}${v}${added.unit}`;
+    }
+    return `${set.reps} reps @ BW`;
+  }
+  return `${set.reps} reps @ ${weightPrint(set.weight)}`;
+}
+
 interface CardOptions extends RenderCallbacks {
   sourcePath: string;
+  app: Plugin["app"];
   completedMask?: boolean[];
 }
 
@@ -50,6 +68,23 @@ function buildExerciseCard(
   const card = container.createDiv({ cls: "liftoscript-exercise" });
   const header = card.createDiv({ cls: "liftoscript-exercise-header" });
   header.createDiv({ text: exercise.name, cls: "liftoscript-exercise-name" });
+
+  // P30: when the exercise matches a Free Exercise DB entry with media or
+  // instructions, render an info (ℹ️) button in the header top-right. Tapping it
+  // opens a modal with equipment, muscles, instructions and images.
+  const matched = findExercise(exercise.name);
+  if (matched && hasExerciseInfo(matched)) {
+    const infoBtn = header.createEl("button", {
+      cls: "liftoscript-exercise-info",
+      attr: { "aria-label": `Show details for ${exercise.name}` },
+      text: "ℹ️",
+    });
+    infoBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      new ExerciseInfoModal(opts.app, matched).open();
+    });
+  }
 
   const setsContainer = card.createDiv({ cls: "liftoscript-sets" });
 
@@ -68,7 +103,7 @@ function buildExerciseCard(
     checkbox.checked = isCompleted;
 
     const label = row.createDiv({ cls: "liftoscript-set-label" });
-    label.setText(`${set.reps} reps @ ${weightPrint(set.weight)}`);
+    label.setText(setLabel(set));
 
     checkbox.addEventListener("change", () => {
       set.completed = checkbox.checked;
@@ -208,7 +243,7 @@ function buildStretchSets(
 export function renderLiftoscriptBlocks(
   el: HTMLElement,
   code: string,
-  opts: CardOptions | RenderCallbacks & { sourcePath: string }
+  opts: CardOptions
 ): void {
   const container = el.createDiv({ cls: "liftoscript" });
   // Split code into exercise lines
@@ -223,6 +258,7 @@ export function renderLiftoscriptBlocks(
       buildExerciseCard(container, exercise, {
         onSetToggled: opts.onSetToggled,
         sourcePath: opts.sourcePath,
+        app: opts.app,
       });
     }
   });
@@ -246,6 +282,7 @@ export function registerLiftoscriptPostProcessor(plugin: Plugin, opts?: RenderCa
         renderLiftoscriptBlocks(container, code, {
           onSetToggled: opts?.onSetToggled,
           sourcePath: ctx.sourcePath,
+          app: plugin.app,
         });
       }
     });

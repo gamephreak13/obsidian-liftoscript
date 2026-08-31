@@ -13,8 +13,27 @@
 }
 
 .liftoscript-exercise-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-weight: 600;
   margin-bottom: 0.4rem;
+}
+
+.liftoscript-exercise-info {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+}
+
+.liftoscript-exercise-info:hover {
+  color: var(--interactive-accent);
 }
 
 .liftoscript-sets {
@@ -169,4 +188,64 @@
 
 .liftoscript-fab:active {
   transform: scale(0.94);
+}
+
+/* P30: Free Exercise DB info modal */
+
+.liftoscript-info-modal .liftoscript-info-meta {
+  margin: 0.25rem 0 0.75rem;
+}
+
+.liftoscript-info-modal .liftoscript-info-section {
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.liftoscript-info-modal .liftoscript-info-steps {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.liftoscript-info-modal .liftoscript-info-steps li + li {
+  margin-top: 0.35rem;
+}
+
+.liftoscript-info-images {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.liftoscript-info-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  object-fit: contain;
+}
+
+.liftoscript-info-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.liftoscript-info-controls button {
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  border-radius: 6px;
+  min-width: 2.25rem;
+}
+
+.liftoscript-info-controls button:hover {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.liftoscript-info-caption {
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }

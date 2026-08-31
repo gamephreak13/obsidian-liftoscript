@@ -37,6 +37,10 @@ export interface Exercise {
   primaryMuscles?: string[];
   /** Secondary / supporting muscles (Free Exercise DB). */
   secondaryMuscles?: string[];
+  /** Step-by-step instructions (Free Exercise DB). */
+  instructions?: string[];
+  /** Relative image paths under the exercises/ dir (e.g. "3_4_Sit-Up/0.jpg"). */
+  images?: string[];
 }
 
 interface FreeExerciseRecord {
@@ -46,6 +50,8 @@ interface FreeExerciseRecord {
   category?: string;
   primaryMuscles?: string[];
   secondaryMuscles?: string[];
+  instructions?: string[];
+  images?: string[];
 }
 
 /**
@@ -78,6 +84,8 @@ export function normalizeFreeExercise(record: FreeExerciseRecord): Exercise {
     secondaryMuscles: Array.isArray(record?.secondaryMuscles)
       ? record.secondaryMuscles
       : [],
+    instructions: Array.isArray(record?.instructions) ? record.instructions : [],
+    images: Array.isArray(record?.images) ? record.images : [],
   };
 }
 
@@ -199,4 +207,35 @@ export function isStretchName(name: string): boolean {
   return getExercises().some(
     (e) => e.category === "stretch" && e.name.toLowerCase() === name.trim().toLowerCase()
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Free Exercise DB media (P30)                                       */
+/* ------------------------------------------------------------------ */
+
+/** Base URL for Free Exercise DB images on the yuhonas GitHub raw host. */
+export const FREE_IMAGE_BASE =
+  "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/";
+
+/**
+ * True when an exercise record carries Free-DB media/instruction content worth
+ * showing in the info modal (only Free Exercise DB records carry these fields).
+ */
+export function hasExerciseInfo(exercise: Exercise | undefined): boolean {
+  if (!exercise) {
+    return false;
+  }
+  return (exercise.images?.length ?? 0) > 0 || (exercise.instructions?.length ?? 0) > 0;
+}
+
+/**
+ * Absolute URL of a Free Exercise DB image. `image` is the record's relative
+ * images[] entry (e.g. "3_4_Sit-Up/0.jpg"); when unavailable, falls back to the
+ * first image or a `<id>/0.jpg` guess.
+ */
+export function exerciseImageUrl(exercise: Exercise, index = 0): string {
+  const rel = exercise.images?.length
+    ? exercise.images[Math.min(index, exercise.images.length - 1)]
+    : `${exercise.id}/0.jpg`;
+  return FREE_IMAGE_BASE + rel;
 }

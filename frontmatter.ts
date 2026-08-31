@@ -1,6 +1,7 @@
 import { App, TFile } from "obsidian";
 import { summarizeWorkoutText, WorkoutSummary } from "./summary";
 import { renderTemplate, formatTemplateDate, TemplateContext } from "./template";
+import type { Unit } from "./parser";
 
 /*
  * frontmatter.ts
@@ -94,9 +95,13 @@ export async function updateWorkoutFrontmatter(
   app: App,
   file: TFile,
   text: string,
-  template?: string
+  template?: string,
+  bodyWeight?: { value: number; unit: Unit }
 ): Promise<void> {
-  const summary = summarizeWorkoutText(text);
+  const summary = summarizeWorkoutText(text, {
+    defaultBodyWeight: bodyWeight?.value,
+    defaultBodyWeightUnit: bodyWeight?.unit,
+  });
   const metrics = buildMetrics(summary);
   const body = renderFrontmatterBody(template ?? "", metrics, {});
   const block = wrapFrontmatter(body);

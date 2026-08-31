@@ -1,4 +1,4 @@
-import { parseExerciseLine, ParsedExercise } from "./parser";
+import { parseExerciseLine, ParsedExercise, weightConvertTo, type Unit } from "./parser";
 
 /*
  * summary.ts
@@ -40,6 +40,9 @@ export function extractLiftoscriptBlocks(text: string): string[] {
 
 export interface SummaryOptions {
   workSecondsPerSet?: number;
+  /** User's body weight (in `defaultBodyWeightUnit`) for bodyweight volume. */
+  defaultBodyWeight?: number;
+  defaultBodyWeightUnit?: Unit;
 }
 
 export function summarizeWorkoutText(
@@ -78,14 +81,26 @@ export function summarizeWorkoutText(
     for (const set of ex.sets) {
       totalSets += 1;
       const weight = set.weight;
-      const numeric = typeof weight === "number" ? weight : weight.value ?? NaN;
-      if (set.completed && !Number.isNaN(numeric)) {
-        totalVolume += numeric * set.reps;
+      const isBodyweight = !!set.isBodyweight && !!set.addedWeight;
+      if (set.completed && (isBodyweight || (typeof weight === "number" ? true : Number.isFinite(weight.value)))) {
         completedSets += 1;
         totalReps += set.reps;
-        const unit = typeof weight === "number" ? null : weight.unit;
-        if (totalVolumeUnit == null && unit != null && set.seconds == null) {
-          totalVolumeUnit = unit;
+        if (isBodyweight) {
+          // Volume for a bodyweight set = (user's body weight + added weight) x reps.
+          const unit: Unit = opts.defaultBodyWeightUnit ?? set.addedWeight!.unit ?? "lb";
+          const bw = opts.defaultBodyWeight ?? 0;
+          const added = weightConvertTo(set.addedWeight!, unit).value;
+          totalVolume += (bw + added) * set.reps;
+          if (totalVolumeUnit == null && set.seconds == null) {
+            totalVolumeUnit = unit;
+          }
+        } else {
+          const numeric = typeof weight === "number" ? weight : weight.value ?? NaN;
+          totalVolume += numeric * set.reps;
+          const unit = typeof weight === "number" ? null : weight.unit;
+          if (totalVolumeUnit == null && unit != null && set.seconds == null) {
+            totalVolumeUnit = unit;
+          }
         }
         // Timed (stretch) sets count their hold as the work time; strength
         // sets use the fixed per-set allowance.

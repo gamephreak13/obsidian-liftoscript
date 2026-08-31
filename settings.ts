@@ -1,5 +1,6 @@
 import { App, normalizePath, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
 import { DATABASE_LABELS, DatabaseId } from "./exerciseDb";
+import type { Unit } from "./parser";
 // Re-export the shared name extractor (defined in the pure exerciseDb module)
 // so existing importers keep using "./settings".
 export { exerciseNameFromLine } from "./exerciseDb";
@@ -31,10 +32,12 @@ export interface LiftoscriptSettings {
   fabRestrictToFolders: boolean;
   fabFolders: string[];
   buttonTemplates: string[];
+  /** User's body weight in `defaultBodyWeightUnit`, used for bodyweight volume. */
+  defaultBodyWeight: number;
+  defaultBodyWeightUnit: "lb" | "kg";
 }
 
-/** The default frontmatter template (P26 default, mirrors the old hardcoded YAML). */
-export const DEFAULT_FRONTMATTER_TEMPLATE = [
+/** The default frontmatter template (P26 default, mirrors the old hardcoded YAML). */export const DEFAULT_FRONTMATTER_TEMPLATE = [
   "date: {{date}}",
   "total_volume: {{total_volume}}",
   "total_volume_unit: {{total_volume_unit}}",
@@ -72,6 +75,8 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
     "[ ] [ ] [ ] Overhead Press / 5x65lb, 5x65lb, 5x65lb, rest: 90",
     "[ ] [ ] [ ] Hamstring Stretch / 3x60s",
   ],
+  defaultBodyWeight: 0,
+  defaultBodyWeightUnit: "lb",
 };
 
 /**
@@ -218,6 +223,30 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
           await plugin.saveSettings();
         })
     );
+
+    new Setting(containerEl).setName("Default body weight").setDesc(
+      "Your body weight, used to compute volume for bodyweight sets (e.g. " +
+        "5xbw or 5xbw+25lb). Bodyweight volume = (body weight + added weight) x reps."
+    ).addText((text) =>
+      text
+        .setPlaceholder("0")
+        .setValue(String(settings.defaultBodyWeight))
+        .onChange(async (value) => {
+          const n = parseFloat(value);
+          const plugin = this.plugin();
+          plugin.settings.defaultBodyWeight = Number.isFinite(n) ? n : 0;
+          await plugin.saveSettings();
+        })
+    ).addDropdown((dd) => {
+      dd.addOption("lb", "lb");
+      dd.addOption("kg", "kg");
+      dd.setValue(settings.defaultBodyWeightUnit);
+      dd.onChange(async (value) => {
+        const plugin = this.plugin();
+        plugin.settings.defaultBodyWeightUnit = value as Unit;
+        await plugin.saveSettings();
+      });
+    });
 
     new Setting(containerEl).setName("Append inline to daily note").setDesc(
       "When enabled, 'Generate Next Workout' appends the generated workout " +

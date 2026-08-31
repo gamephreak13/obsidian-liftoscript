@@ -74,7 +74,16 @@ export default class LiftoscriptPlugin extends Plugin {
 				}
 				if (!checking) {
 					this.app.vault.cachedRead(file).then(async (text) => {
-						await updateWorkoutFrontmatter(this.app, file, text, this.settings.frontmatterTemplate);
+						await updateWorkoutFrontmatter(
+							this.app,
+							file,
+							text,
+							this.settings.frontmatterTemplate,
+							{
+								value: this.settings.defaultBodyWeight,
+								unit: this.settings.defaultBodyWeightUnit,
+							}
+						);
 						new Notice("Workout metrics updated.");
 					});
 				}
@@ -182,6 +191,12 @@ export default class LiftoscriptPlugin extends Plugin {
 		content: string
 	) {
 		const dir = folder.trim();
+		// If a workout folder is configured but doesn't exist yet, create it
+		// (and any missing parents) before writing, so a new vault / fresh
+		// settings path never fails the write.
+		if (dir) {
+			await this.ensureFolderExists(this.app.vault, dir);
+		}
 		const prefix = dir ? `${dir}/` : "";
 
 		// P28: render the output filename from the configured convention
@@ -202,6 +217,26 @@ export default class LiftoscriptPlugin extends Plugin {
 		const leaf = this.app.workspace.getLeaf(false);
 		await leaf.openFile(newFile);
 		new Notice(`Created ${newFile.name}`);
+	}
+
+	/**
+	 * Recursively create a vault folder (and any missing parents) if absent.
+	 * Uses createFolder per level so a nested, not-yet-existing path like
+	 * "Fitness/Reports/2026" is created in full before a file is written into it.
+	 */
+	private async ensureFolderExists(
+		vault: import("obsidian").Vault,
+		folder: string
+	): Promise<void> {
+		const clean = folder.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
+		let partial = "";
+		for (const segment of clean) {
+			partial = partial ? `${partial}/${segment}` : segment;
+			if (vault.getAbstractFileByPath(partial)) {
+				continue;
+			}
+			await vault.createFolder(partial);
+		}
 	}
 
 	/** Substitute {{date}}, {{time}}, {{workout_name}} into the filename stem. */
