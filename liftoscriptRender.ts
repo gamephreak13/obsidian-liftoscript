@@ -1,4 +1,4 @@
-import { MarkdownPostProcessorContext, MarkdownPostProcessor, Plugin } from "obsidian";
+import { MarkdownPostProcessorContext, MarkdownPostProcessor, Plugin, setIcon } from "obsidian";
 import { parseExerciseLine, ParsedExercise, ParsedExerciseSet, weightPrint } from "./parser";
 import { startRest, stopRest } from "./restTimer";
 import { notifyRestComplete } from "./notify";
@@ -75,15 +75,15 @@ function buildExerciseCard(
   const actions = header.createDiv({ cls: "liftoscript-exercise-actions" });
 
   // P30: when the exercise matches a Free Exercise DB entry with media or
-  // instructions, render an info (ℹ️) button in the header top-right. Tapping it
+  // instructions, render an info button in the header top-right. Tapping it
   // opens a modal with equipment, muscles, instructions and images.
   const matched = findExercise(exercise.name);
   if (matched && hasExerciseInfo(matched)) {
     const infoBtn = actions.createEl("button", {
       cls: "liftoscript-exercise-info",
       attr: { "aria-label": `Show details for ${exercise.name}` },
-      text: "ℹ️",
     });
+    setIcon(infoBtn, "info");
     infoBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -97,8 +97,8 @@ function buildExerciseCard(
   const editBtn = actions.createEl("button", {
     cls: "liftoscript-exercise-edit",
     attr: { "aria-label": `Edit ${exercise.name} line` },
-    text: "✎",
   });
+  setIcon(editBtn, "pencil");
   editBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
