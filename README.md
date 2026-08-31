@@ -329,3 +329,22 @@ npm run build      # production build -> main.js + liftoscript-api.js
 - Build output: `main.js`, `manifest.json`, `styles.css`, and `liftoscript-api.js` (Templater module).
 
 **No external runtime dependencies** — the plugin only uses Obsidian's standard APIs, and the notification chime is embedded as a Base64 data URI so it's fully self-contained.
+
+---
+
+## Credits
+
+This plugin wouldn't exist without these projects:
+
+- **[Liftosaur](https://www.liftosaur.com/)** — the open-source workout app by
+  Alexandr Zinchenko that created the underlying scripting engine this plugin
+  ports (`parser.ts` is a standalone reimplementation of Liftosaur's evaluator,
+  weight model, and linear progression).
+- **[Liftoscript](https://www.liftosaur.com/docs/syntax)** — Liftosaur's
+  scripting language, which this plugin renders directly inside Obsidian notes.
+- **[Free Exercise DB](https://github.com/yuhonas/free-exercise-db)** — the
+  open-source exercise database (yuhonas) bundled and used for autocomplete as
+  an alternative to the native Liftosaur list.
+
+Thank you!
+

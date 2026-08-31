@@ -411,6 +411,32 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
           await plugin.saveSettings();
         })
     );
+
+    containerEl.createEl("h3", { text: "Credits" });
+
+    const credits = containerEl.createEl("p", {
+      cls: "liftoscript-credits",
+    });
+    credits.createSpan({ text: "Built on " });
+    credits.createEl("a", {
+      text: "Liftosaur",
+      href: "https://www.liftosaur.com/",
+    });
+    credits.createSpan({
+      text: "'s ",
+    });
+    credits.createEl("a", {
+      text: "Liftoscript",
+      href: "https://www.liftosaur.com/docs/syntax",
+    });
+    credits.createSpan({
+      text: " scripting language. Exercise autocomplete uses the ",
+    });
+    credits.createEl("a", {
+      text: "Free Exercise DB",
+      href: "https://github.com/yuhonas/free-exercise-db",
+    });
+    credits.createSpan({ text: ". Thanks!" });
   }
 }
 
