@@ -12,6 +12,8 @@ import {
 	readVaultText,
 	resolveFolder,
 } from "./settings";
+import { LogExerciseModal } from "./inputModal";
+import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 
 export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
@@ -68,6 +70,34 @@ export default class LiftoscriptPlugin extends Plugin {
 				return true;
 			},
 		});
+
+		this.addCommand({
+			id: "log-exercise",
+			name: "Log exercise",
+			checkCallback: (checking) => {
+				const file = this.app.workspace.getActiveFile();
+				if (!(file instanceof TFile)) {
+					return false;
+				}
+				if (!checking) {
+					const modal = new LogExerciseModal(this.app, {
+						onSubmit: async (result) => {
+							await this.appendExerciseLine(file, result.line);
+						},
+					});
+					modal.open();
+				}
+				return true;
+			},
+		});
+	}
+
+	/** Append a generated liftoscript line into the active note. */
+	private async appendExerciseLine(file: TFile, line: string) {
+		const text = await this.app.vault.cachedRead(file);
+		const updated = insertLineIntoLastBlock(text, line);
+		await this.app.vault.modify(file, updated);
+		new Notice(`Logged ${line.split(" / ")[0].trim()}`);
 	}
 
 	private async generateNextWorkout(previous: TFile) {
@@ -161,8 +191,3 @@ export default class LiftoscriptPlugin extends Plugin {
 	onunload() {}
 }
 
-/** Remove leading YAML frontmatter from a note's body for inline appends. */
-function stripFrontmatter(content: string): string {
-	const m = content.match(/^---\n[\s\S]*?\n---\n?/);
-	return m ? content.slice(m[0].length) : content;
-}
