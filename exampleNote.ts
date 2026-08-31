@@ -13,10 +13,17 @@ import { BUTTON_COMMAND_PREFIX } from "./settings";
 /** Path of the seeded example note (vault root). */
 export const EXAMPLE_NOTE_PATH = "Liftosaur-Example.md";
 
+/**
+ * Sentinel marking the note as plugin-generated so a stale seeded copy is
+ * refreshed on load, while a user's own note at the same path is left alone.
+ */
+export const EXAMPLE_SENTINEL = "liftoscript_example: true";
+
 /** Fully mocked example note demonstrating the plugin's capabilities. */
 export const EXAMPLE_NOTE_CONTENT = `---
 date: 2026-08-30
 type: workout
+liftoscript_example: true
 total_volume: 4500
 total_volume_unit: lb
 completed_sets: 6
@@ -75,13 +82,19 @@ action:
 `;
 
 /**
- * Create the example note on first activation if it does not already exist.
- * Never overwrites an existing note at the same path.
+ * Ensure the example note exists and is current. Creates it on first load;
+ * refreshes an existing copy that carries the plugin's sentinel so seed
+ * updates (e.g. new button markup) reach the note; never touches a user's own
+ * note at the same path.
  */
 export async function ensureExampleNote(app: App): Promise<void> {
   const path = normalizePath(EXAMPLE_NOTE_PATH);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
+    const text = await app.vault.cachedRead(existing);
+    if (text.includes(EXAMPLE_SENTINEL)) {
+      await app.vault.process(existing, () => EXAMPLE_NOTE_CONTENT);
+    }
     return;
   }
   await app.vault.create(path, EXAMPLE_NOTE_CONTENT);
