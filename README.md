@@ -245,16 +245,54 @@ After this session:
 
 ---
 
+## Templater Integration (P17)
+
+The plugin ships a standalone, Obsidian-free JS module called
+`liftoscript-api.js`. Copy it into your **Templater Scripts folder**
+(Settings → Templater → Script user functions folder), and its functions
+become available as `tp.user.liftoscript_api`.
+
+This is handy when you generate a daily note with Templater and want to bake
+in progressive-overload data right away. Example Templater snippet:
+
+```
+<%*
+const api = tp.user.liftoscript_api;
+const prev = await tp.file.find_tfile("Workouts/Last Session");
+const previousText = await app.vault.read(prev);
+const next = api.buildNextWorkoutContent({
+  previousPath: prev.path,
+  previousText,
+  previousTitle: prev.basename,
+});
+// next is the full note body (YAML + overloaded liftoscript blocks)
+tR += next;
+%>
+```
+
+Exported functions:
+
+| Function | Purpose |
+| --- | --- |
+| `buildNextWorkoutContent({previousPath, previousText, previousTitle})` | The full next-workout note (overloads `lp()`, resets markers, zeroed YAML, backlink). |
+| `computeNextExercise(parsed)` | Apply `lp()` to one parsed exercise; returns the next line + new weight. |
+| `parseExerciseLine(line)` | Parse one liftoscript line into a `ParsedExercise`. |
+| `summarizeWorkoutText(text)` | Compute volume / sets / reps / duration. |
+| `extractLiftoscriptBlocks(text)` | Pull the raw content of all ````liftoscript```` fences. |
+| `weightToToken(weight)` / `BLOCK_LANG` | Weight formatting / the `liftoscript` fence language. |
+
+---
+
 ## Development
 
 ```bash
 npm install        # first time
 npm run dev        # watch-build (esbuild, non-minified)
-npm run build      # production build -> main.js
+npm run build      # production build -> main.js + liftoscript-api.js
 ```
 
 - `main.ts` — plugin entry point (registers commands, suggest, post-processor).
 - `parser.ts` — standalone port of Liftoscript's evaluator + weight model + linear progression + timed stretch sets.
-- Build output: `main.js`, `manifest.json`, `styles.css`.
+- Build output: `main.js`, `manifest.json`, `styles.css`, and `liftoscript-api.js` (Templater module).
 
 **No external runtime dependencies** — the plugin only uses Obsidian's standard APIs, and the notification chime is embedded as a Base64 data URI so it's fully self-contained.

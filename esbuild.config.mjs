@@ -40,9 +40,28 @@ const context = await esbuild.context({
 	outfile: "main.js",
 });
 
+// P17: bundle the Templater API as a standalone, Obsidian-free JS module.
+// The user drops liftoscript-api.js into their Templater "Scripts" folder.
+const apiContext = await esbuild.context({
+	banner: {
+		js: "/* Liftoscript API for Templater (tp.user.liftoscript_api) */",
+	},
+	entryPoints: ["templaterApi.ts"],
+	bundle: true,
+	format: "cjs",
+	target: "es2018",
+	platform: "node",
+	logLevel: "info",
+	treeShaking: true,
+	outfile: "liftoscript-api.js",
+});
+
 if (prod) {
 	await context.rebuild();
+	await apiContext.rebuild();
+	await apiContext.dispose();
 	process.exit(0);
 } else {
 	await context.watch();
+	await apiContext.watch();
 }
