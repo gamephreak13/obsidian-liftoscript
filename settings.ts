@@ -257,12 +257,13 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
         })
     );
 
-    containerEl.createEl("h3", { text: "Buttons integration" });
+    containerEl.createEl("h3", { text: "Meta Bind integration" });
 
     new Setting(containerEl).setName("Quick-add exercise templates").setDesc(
       "One liftoscript line per template. Each becomes a command named " +
-        "\"Liftoscript: Add <exercise>\", which Buttons buttons can invoke via " +
-        "type command action. Changes apply after a plugin reload."
+        "\"Liftoscript: Add <exercise>\", which Meta Bind buttons can invoke " +
+        "via a ```meta-bind-button block with \"type: command\" and the command id. " +
+        "Changes apply after a plugin reload."
     ).addTextArea((area) =>
       area
         .setPlaceholder("[ ] [ ] [ ] Squat / 5x200lb, rest: 120")

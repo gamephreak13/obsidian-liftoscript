@@ -5,8 +5,8 @@ import { App, normalizePath, TFile } from "obsidian";
  *
  * P20: on first activation the plugin seeds a Liftosaur-Example.md at the vault
  * root so users immediately see a fully mocked workout, YAML frontmatter, and
- * Buttons-plugin quick-add buttons. Only created once — an existing note is
- * never overwritten.
+ * Meta Bind quick-add buttons. Only created once — an existing note is never
+ * overwritten.
  */
 
 /** Path of the seeded example note (vault root). */
@@ -52,18 +52,23 @@ metrics** and **Generate Next Workout** from the command palette.
 ## Quick add
 
 Tapping a button below runs the matching **Liftoscript: Add <exercise>**
-command to append a fresh line into the active note.
+command (via the [Meta Bind](https://www.metabind.org/) plugin) to append a
+fresh line into the active note.
 
-\`\`\`button
-name Add Bench Press
-type command
-action liftoscript-add-bench-press
+\`\`\`meta-bind-button
+label: Add Bench Press
+style: primary
+action:
+  type: command
+  command: liftoscript-add-bench-press
 \`\`\`
 
-\`\`\`button
-name Add Squat
-type command
-action liftoscript-add-squat
+\`\`\`meta-bind-button
+label: Add Squat
+style: primary
+action:
+  type: command
+  command: liftoscript-add-squat
 \`\`\`
 `;
 
