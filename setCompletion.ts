@@ -1,11 +1,12 @@
 import { App, TFile } from "obsidian";
+import { atomicModify } from "./atomicWrite";
 
 /*
  * setCompletion.ts
  *
  * P8: binds rendered checkboxes to the actual markdown file. When a set is
  * toggled, we rewrite the "[ ]"/"[x]" completion marker at its known char offset
- * in the source line and persist via Vault.modify().
+ * in the source line and persist via a serialized, atomic write.
  *
  * Writes are debounced/batched so that rapid toggling does not race. The rest
  * countdown (restTimer.ts) is deliberately NOT persisted to the file.
@@ -36,7 +37,7 @@ export async function syncSetCompletion(
     // No marker to update (e.g. the raw line has none).
     return;
   }
-  await app.vault.process(file, (data) => {
+  await atomicModify(app, file, (data) => {
     // Our char offsets were computed against the trimmed-line's original
     // position in the file. Re-locate by replacing the first identical
     // occurrence of the old line to remain robust against whitespace drift.

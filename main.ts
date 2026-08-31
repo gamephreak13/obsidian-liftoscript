@@ -17,6 +17,7 @@ import {
 } from "./settings";
 import { LogExerciseModal } from "./inputModal";
 import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
+import { atomicModify } from "./atomicWrite";
 
 export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
@@ -101,11 +102,9 @@ export default class LiftoscriptPlugin extends Plugin {
 		});
 	}
 
-	/** Append a generated liftoscript line into the active note. */
+	/** Append a generated liftoscript line into the active note (atomic, queued). */
 	private async appendExerciseLine(file: TFile, line: string) {
-		const text = await this.app.vault.cachedRead(file);
-		const updated = insertLineIntoLastBlock(text, line);
-		await this.app.vault.modify(file, updated);
+		await atomicModify(this.app, file, (text) => insertLineIntoLastBlock(text, line));
 		new Notice(`Logged ${line.split(" / ")[0].trim()}`);
 	}
 
@@ -130,9 +129,9 @@ export default class LiftoscriptPlugin extends Plugin {
 			const active = this.app.workspace.getActiveFile();
 			if (active instanceof TFile) {
 				const body = stripFrontmatter(content);
-				const existing = await this.app.vault.cachedRead(active);
-				const appended = existing.replace(/\s*$/, "") + "\n\n" + body + "\n";
-				await this.app.vault.modify(active, appended);
+				await atomicModify(this.app, active, (existing) =>
+					existing.replace(/\s*$/, "") + "\n\n" + body + "\n"
+				);
 				new Notice(`Appended workout to ${active.name}`);
 			} else {
 				new Notice("No active note to append to; creating a file instead.");
