@@ -18,6 +18,7 @@ import {
 import { LogExerciseModal } from "./inputModal";
 import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 import { atomicModify } from "./atomicWrite";
+import { ensureExampleNote } from "./exampleNote";
 
 export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
@@ -26,6 +27,13 @@ export default class LiftoscriptPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		// P20: seed the example note on first activation; a failure must never
+		// block plugin startup.
+		try {
+			await ensureExampleNote(this.app);
+		} catch (e) {
+			console.error("Liftoscript: failed to create example note", e);
+		}
 		this.addSettingTab(new LiftoscriptSettingTab(this.app, this, () => {
 			void this.applyCustomExercises();
 		}));
