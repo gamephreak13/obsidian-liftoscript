@@ -380,6 +380,15 @@ npm run build      # production build -> main.js + liftoscript-api.js
 
 **No external runtime dependencies** — the plugin only uses Obsidian's standard APIs, and the notification chime is embedded as a Base64 data URI so it's fully self-contained.
 
+### Source & mirror
+
+The canonical repository lives on GitLab, and a [CI/CD pipeline](.gitlab-ci.yml)
+keeps a GitHub mirror automatically in sync. Every push to `main` (and every
+tag) is mirrored to:
+
+- GitLab: <https://gitlab.com/gamephreak13/obsidian-liftoscript>
+- GitHub: <https://github.com/gamephreak13/obsidian-liftoscript>
+
 ---
 
 ## Credits
