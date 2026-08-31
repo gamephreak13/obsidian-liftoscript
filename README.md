@@ -382,9 +382,7 @@ npm run build      # production build -> main.js + liftoscript-api.js
 
 ### Source & mirror
 
-The canonical repository lives on GitLab, and a [CI/CD pipeline](.gitlab-ci.yml)
-keeps a GitHub mirror automatically in sync. Every push to `main` (and every
-tag) is mirrored to:
+The repository is hosted in parallel on both platforms, kept in sync directly:
 
 - GitLab: <https://gitlab.com/gamephreak13/obsidian-liftoscript>
 - GitHub: <https://github.com/gamephreak13/obsidian-liftoscript>
