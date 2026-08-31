@@ -2,12 +2,23 @@
 #
 # Mirror the GitLab repository to GitHub. On every push to the default branch
 # (and on tags), a fresh clone of the GitLab repo is pushed to the GitHub
-# mirror, so the two repos stay in sync without any manual steps.
+# mirror over SSH, so the two repos stay in sync without any manual steps.
 #
 # Required GitLab CI/CD variable:
-#   GITHUB_PAT  - a GitHub Personal Access Token with `repo` scope
-#                 (Settings -> Developer settings -> Personal access tokens).
-#                 Add it under GitLab: Settings -> CI/CD -> Variables.
+#   SSH_PRIVATE_KEY - the PRIVATE half of a GitHub "Deploy key" with WRITE
+#                     access, scoped to gamephreak13/obsidian-liftoscript.
+#                     1. GitHub: repo -> Settings -> Deploy keys -> Add (write)
+#                         -> paste the public key.
+#                     2. Generate the key pair locally, e.g.:
+#                           ssh-keygen -t ed25519 -C "gitlab-mirror" -f gitlab-mirror
+#                         (Add the public key to GitHub as above; the private
+#                          key goes into this CI/CD variable.)
+#                     3. GitLab: Settings -> CI/CD -> Variables -> add a
+#                        "File"-type variable named SSH_PRIVATE_KEY containing
+#                        the private key text. Mark it Protected + Masked.
+#
+# The job SSH's to github.com using that deploy key and pushes the default
+# branch plus all tags, keeping GitHub in lock-step with GitLab.
 
 stages:
   - mirror
@@ -18,14 +29,23 @@ mirror-to-github:
   variables:
     GIT_STRATEGY: clone
     GIT_DEPTH: 0
+    GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null"
+  before_script:
+    - apk add --no-cache openssh-client git
+    # Load the deploy key's private key into an ssh-agent for this job.
+    - eval "$(ssh-agent -s)"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    # Write the key to a temp file (POSIX-safe, unlike process substitution)
+    # with owner-only perms so ssh-add accepts it, then remove it.
+    - printf '%s\n' "$SSH_PRIVATE_KEY" > /tmp/gitlab_mirror_key
+    - chmod 600 /tmp/gitlab_mirror_key
+    - ssh-add /tmp/gitlab_mirror_key
+    - rm -f /tmp/gitlab_mirror_key
   script:
-    - apk add --no-cache openssh-client
-    - git config --global credential.helper store
     - git config --global init.defaultBranch main
-    # GitHub as the mirror remote. The token travels in the job log-free via
-    # the CI/CD variable; the credential helper keeps it out of the prompt.
-    - echo "https://x-access-token:${GITHUB_PAT}@github.com" > ~/.git-credentials
-    - git remote add github https://x-access-token@github.com/gamephreak13/obsidian-liftoscript.git
+    # GitHub as the mirror remote, reached over SSH with the deploy key.
+    - git remote add github git@github.com:gamephreak13/obsidian-liftoscript.git
     # Push the default branch and all tags so the mirror matches GitLab.
     - git push github "${CI_DEFAULT_BRANCH:-main}:main"
     - git push --tags github
