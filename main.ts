@@ -1,9 +1,11 @@
-import { Notice, Platform, Plugin, TFile, setIcon } from "obsidian";
-import { ExerciseSuggest, setCustomExercises } from "./exerciseDb";
+import { Notice, Platform, Plugin, TFile, requestUrl, setIcon } from "obsidian";
+import { setCustomExercises, setActiveDatabase, setFreeRemoteExercises } from "./exerciseDb";
+import { ExerciseSuggest } from "./exerciseSuggest";
 import { registerLiftoscriptPostProcessor, RenderCallbacks } from "./liftoscriptRender";
 import { syncSetCompletion } from "./setCompletion";
 import { updateWorkoutFrontmatter } from "./frontmatter";
 import { buildNextWorkoutContent } from "./nextWorkout";
+import { formatTemplateDate, formatTemplateTime, renderTemplate } from "./template";
 import {
 	DEFAULT_SETTINGS,
 	exerciseNameFromLine,
@@ -24,6 +26,8 @@ export default class LiftoscriptPlugin extends Plugin {
 	settings: LiftoscriptSettings;
 	private fabEl: HTMLElement | null = null;
 	private buttonCommandIds: string[] = [];
+	/** The last remote URL we successfully fetched, to avoid duplicate fetches. */
+	private fetchedRemoteUrl = "";
 
 	async onload() {
 		await this.loadSettings();
@@ -33,11 +37,18 @@ export default class LiftoscriptPlugin extends Plugin {
 			void this.applyCustomExercises();
 		}, () => {
 			void this.ensureExampleFile();
+		}, () => {
+			// P29: manual refresh of the remote Free Exercise DB.
+			void this.applyRemoteDatabase(true);
 		}));
 
 		this.registerButtonCommands();
 
 		this.registerEditorSuggest(new ExerciseSuggest(this.app));
+
+		// P29: when the active database is the remote Free DB, fetch it on load
+		// (with the bundled copy as the offline fallback).
+		void this.applyRemoteDatabase(false);
 
 		const callbacks: RenderCallbacks = {
 			onSetToggled: (lineText, markerStart, markerEnd, completed, sourcePath) => {
@@ -63,7 +74,7 @@ export default class LiftoscriptPlugin extends Plugin {
 				}
 				if (!checking) {
 					this.app.vault.cachedRead(file).then(async (text) => {
-						await updateWorkoutFrontmatter(this.app, file, text);
+						await updateWorkoutFrontmatter(this.app, file, text, this.settings.frontmatterTemplate);
 						new Notice("Workout metrics updated.");
 					});
 				}
@@ -132,13 +143,13 @@ export default class LiftoscriptPlugin extends Plugin {
 
 	private async generateNextWorkout(previous: TFile) {
 		const previousText = await this.app.vault.cachedRead(previous);
-		const date = new Date().toISOString().slice(0, 10);
 		const baseName = previous.basename.replace(/-\d{4}-\d{2}-\d{2}$/, "") || "Workout";
 
 		const content = buildNextWorkoutContent({
 			previousPath: previous.path,
 			previousText,
 			previousTitle: previous.basename,
+			frontmatterTemplate: this.settings.frontmatterTemplate,
 		});
 
 		// P18: honor the configured workout folder ("" == the active note's folder).
@@ -157,27 +168,32 @@ export default class LiftoscriptPlugin extends Plugin {
 				new Notice(`Appended workout to ${active.name}`);
 			} else {
 				new Notice("No active note to append to; creating a file instead.");
-				await this.createWorkoutFile(folder, baseName, date, content);
+				await this.createWorkoutFile(folder, baseName, content);
 			}
 			return;
 		}
 
-		await this.createWorkoutFile(folder, baseName, date, content);
+		await this.createWorkoutFile(folder, baseName, content);
 	}
 
 	private async createWorkoutFile(
 		folder: string,
 		baseName: string,
-		date: string,
 		content: string
 	) {
 		const dir = folder.trim();
 		const prefix = dir ? `${dir}/` : "";
 
-		let filename = `${baseName}-${date}.md`;
+		// P28: render the output filename from the configured convention
+		// (settings.workoutFilenameTemplate), then ensure a unique name.
+		const template = (this.settings.workoutFilenameTemplate || "").trim()
+			|| "{{workout_name}}-{{date}}";
+		const stem = this.renderFilenameTemplate(template, baseName);
+
+		let filename = `${stem}.md`;
 		let counter = 2;
 		while (this.app.vault.getAbstractFileByPath(prefix + filename)) {
-			filename = `${baseName}-${date}-${counter}.md`;
+			filename = `${stem}-${counter}.md`;
 			counter += 1;
 		}
 
@@ -188,14 +204,43 @@ export default class LiftoscriptPlugin extends Plugin {
 		new Notice(`Created ${newFile.name}`);
 	}
 
+	/** Substitute {{date}}, {{time}}, {{workout_name}} into the filename stem. */
+	private renderFilenameTemplate(template: string, workoutName: string): string {
+		const now = new Date();
+		const stem = renderTemplate(template, {
+			date: formatTemplateDate(now),
+			time: formatTemplateTime(now),
+			workout_name: workoutName,
+		})
+			.trim()
+			.replace(/[\\/:*?"<>|]+/g, "-")
+			.replace(/\s+/g, " ")
+			.replace(/^-+|-+$/g, "");
+		// A template with no variables (or all removed) must still be unique.
+		return stem || `${workoutName}-${formatTemplateDate(now)}`;
+	}
+
 	async saveSettings() {
 		await this.saveData(this.settings);
+		// P22: keep the active exercise database in sync with the setting.
+		setActiveDatabase(this.settings.activeExerciseDb);
+		// P29: refetch the remote Free DB when switching to it or changing the URL.
+		const remoteUrl = (this.settings.freeExerciseRemoteUrl || "").trim();
+		if (
+			this.settings.activeExerciseDb === "free-remote" &&
+			remoteUrl &&
+			remoteUrl !== this.fetchedRemoteUrl
+		) {
+			void this.applyRemoteDatabase(false);
+		}
 		this.refreshFAB();
 		this.registerButtonCommands();
 	}
 
 	private async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// P22: apply the active exercise database choice.
+		setActiveDatabase(this.settings.activeExerciseDb);
 		this.refreshFAB();
 	}
 
@@ -289,6 +334,45 @@ export default class LiftoscriptPlugin extends Plugin {
 			this.removeCommand(id);
 		}
 		this.buttonCommandIds = [];
+	}
+
+	/**
+	 * P29: fetch the Free Exercise DB from the configured remote URL. On success
+	 * the normalized records are stored and drive the "free-remote" mode; on any
+	 * failure (offline, 404, bad JSON) we clear the remote store so lookups fall
+	 * back to the bundled local copy. `notify` shows a confirmation Notice (used
+	 * by the manual Refresh button), while quiet startup fetches stay silent.
+	 */
+	async applyRemoteDatabase(notify: boolean): Promise<void> {
+		const url = (this.settings.freeExerciseRemoteUrl || "").trim();
+		if (!url) {
+			if (notify) {
+				new Notice("Free Exercise DB: remote URL is empty.");
+			}
+			return;
+		}
+		try {
+			const res = await requestUrl({ url });
+			const parsed: unknown = JSON.parse(res.text);
+			const arr: unknown =
+				Array.isArray(parsed) ? parsed : (parsed as { exercises?: unknown } | null)?.exercises;
+			if (!Array.isArray(arr)) {
+				throw new Error("response is not an exercise array");
+			}
+			setFreeRemoteExercises(arr as Array<Record<string, unknown>>);
+			this.fetchedRemoteUrl = url;
+			if (notify) {
+				new Notice(`Free Exercise DB: loaded ${arr.length} exercises from remote.`);
+			} else {
+				console.info(`Liftoscript: loaded ${arr.length} exercises from remote Free DB`);
+			}
+		} catch (e) {
+			setFreeRemoteExercises([]);
+			console.warn("Liftoscript: remote Free DB fetch failed, using bundled copy", e);
+			if (notify) {
+				new Notice("Free Exercise DB: remote fetch failed — using the bundled copy.");
+			}
+		}
 	}
 
 	/** Load + merge the configured custom exercise database (P18 option 3). */

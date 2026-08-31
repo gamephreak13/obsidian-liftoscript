@@ -1,4 +1,4 @@
-import exerciseData from "./exercises.json";
+import { isStretchName } from "./exerciseDb";
 
 /*
  * parser.ts
@@ -31,21 +31,13 @@ const DEFAULT_UNIT: Unit = "lb";
 /** Matches a manual "type: stretch" tag on an exercise line. */
 const STRETCH_TAG_RE = /type\s*:\s*stretch\b/i;
 
-interface ExerciseRecord {
-  id: string;
-  name: string;
-  equipment?: string;
-  category?: string;
-}
-
-const EXERCISE_RECORDS = exerciseData as ExerciseRecord[];
-
-/** True when the exercise name matches a "stretch" entry in the database. */
+/**
+ * True when the exercise name matches a "stretch" entry in the active database
+ * (P22/P23): stretch detection is delegated to exerciseDb so it follows the
+ * currently selected dataset and the Free-DB "stretching" normalization.
+ */
 export function isStretchExerciseName(name: string): boolean {
-  const normalized = name.trim().toLowerCase();
-  return EXERCISE_RECORDS.some(
-    (e) => e.category === "stretch" && e.name.toLowerCase() === normalized
-  );
+  return isStretchName(name);
 }
 
 /* ------------------------------------------------------------------ */

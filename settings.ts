@@ -1,30 +1,64 @@
 import { App, normalizePath, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
+import { DATABASE_LABELS, DatabaseId } from "./exerciseDb";
 
 /*
  * settings.ts
  *
- * P18: plugin settings tab. Exposes three configuration options:
- *   1. workoutFolder      - directory where "Generate Next Workout" writes files
- *   2. appendToDailyNote  - append the generated workout inline to the active
- *                           daily note instead of creating a separate file
- *   3. customExerciseDb   - path to a JSON file overriding/merging the default
- *                           Liftosaur exercise database (applied on save)
+ * P18 + P22 + P25 + P27: plugin settings tab. Exposes:
+ *   1. workoutFolder        - directory where "Generate Next Workout" writes files
+ *   2. appendToDailyNote    - append the generated workout inline to the active
+ *                             daily note instead of creating a separate file
+ *   3. customExerciseDb     - path to a JSON file overriding/merging the active
+ *                             exercise database (applied on save)
+ *   4. activeExerciseDb     - dropdown choosing "Native Liftosaur" or
+ *                             "Free Exercise DB" (P22)
+ *   5. frontmatterTemplate  - custom YAML frontmatter template (P25/P26)
+ *   6. workoutFilenameTemplate - default output filename convention (P27/P28)
  */
 
 export interface LiftoscriptSettings {
   workoutFolder: string;
   appendToDailyNote: boolean;
   customExerciseDb: string;
+  activeExerciseDb: DatabaseId;
+  freeExerciseRemoteUrl: string;
+  frontmatterTemplate: string;
+  workoutFilenameTemplate: string;
   fabMode: "mobile" | "desktop" | "both";
   fabRestrictToFolders: boolean;
   fabFolders: string[];
   buttonTemplates: string[];
 }
 
+/** The default frontmatter template (P26 default, mirrors the old hardcoded YAML). */
+export const DEFAULT_FRONTMATTER_TEMPLATE = [
+  "date: {{date}}",
+  "total_volume: {{total_volume}}",
+  "total_volume_unit: {{total_volume_unit}}",
+  "completed_sets: {{completed_sets}}",
+  "total_sets: {{total_sets}}",
+  "total_reps: {{total_reps}}",
+  "exercises_completed: {{exercises_completed}}",
+  "session_duration: {{session_duration}}",
+  "session_duration_seconds: {{session_duration_seconds}}",
+  "last_updated: {{last_updated}}",
+].join("\n");
+
+/** The default output filename convention (P28). */
+export const DEFAULT_FILENAME_TEMPLATE = "{{workout_name}}-{{date}}";
+
+/** Default remote source for the "Free Exercise DB (Remote)" variant (P29). */
+export const DEFAULT_FREE_DB_URL =
+  "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json";
+
 export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   workoutFolder: "",
   appendToDailyNote: false,
   customExerciseDb: "",
+  activeExerciseDb: "free",
+  freeExerciseRemoteUrl: DEFAULT_FREE_DB_URL,
+  frontmatterTemplate: DEFAULT_FRONTMATTER_TEMPLATE,
+  workoutFilenameTemplate: DEFAULT_FILENAME_TEMPLATE,
   fabMode: "mobile",
   fabRestrictToFolders: false,
   fabFolders: [],
@@ -153,17 +187,20 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
   private readonly plugin: () => LiftoscriptPluginLike;
   private readonly onApplyCustom: () => void;
   private readonly onGenerateExample: () => void;
+  private readonly onRefreshRemote: () => void;
 
   constructor(
     app: App,
     plugin: LiftoscriptPluginLike,
     onApplyCustom: () => void,
-    onGenerateExample: () => void
+    onGenerateExample: () => void,
+    onRefreshRemote: () => void
   ) {
     super(app, plugin);
     this.plugin = () => plugin;
     this.onApplyCustom = onApplyCustom;
     this.onGenerateExample = onGenerateExample;
+    this.onRefreshRemote = onRefreshRemote;
   }
 
   override display(): void {
@@ -197,6 +234,49 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
           await plugin.saveSettings();
         })
     );
+
+    containerEl.createEl("h3", { text: "Exercise database" });
+
+    new Setting(containerEl).setName("Active exercise database").setDesc(
+      "Choose which dataset drives exercise autocomplete and stretch/strength " +
+        "parsing. 'Native Liftosaur' uses the built-in list. 'Free Exercise DB " +
+        "(Local)' uses the bundled open-source dataset (searchable by muscle " +
+        "group and equipment). 'Free Exercise DB (Remote)' fetches the same " +
+        "dataset live from the URL below, falling back to the bundled copy if " +
+        "the fetch fails."
+    ).addDropdown((dd) => {
+      for (const [id, label] of Object.entries(DATABASE_LABELS) as [DatabaseId, string][]) {
+        dd.addOption(id, label);
+      }
+      dd.setValue(settings.activeExerciseDb);
+      dd.onChange(async (value) => {
+        const plugin = this.plugin();
+        plugin.settings.activeExerciseDb = value as DatabaseId;
+        await plugin.saveSettings();
+      });
+    });
+
+    new Setting(containerEl).setName("Free Exercise DB remote URL").setDesc(
+      "Source for the 'Free Exercise DB (Remote)' variant. Points at the " +
+        "upstream GitHub raw dist/exercises.json by default; change it to use a " +
+        "mirror or a self-hosted copy."
+    ).addText((text) =>
+      text
+        .setPlaceholder(DEFAULT_FREE_DB_URL)
+        .setValue(settings.freeExerciseRemoteUrl)
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.freeExerciseRemoteUrl = value.trim();
+          await plugin.saveSettings();
+        })
+    );
+
+    new Setting(containerEl).setName("Refresh remote database").setDesc(
+      "Re-fetch the Free Exercise DB from the URL above now."
+    ).addButton((button) =>
+      button.setButtonText("Refresh").setCta().onClick(() => this.onRefreshRemote())
+    );
+
 
     new Setting(containerEl).setName("Custom exercise database").setDesc(
       "Path (relative to the vault) to a JSON file that overrides or appends to " +
@@ -294,6 +374,43 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
             .split("\n")
             .map((line) => line.trim())
             .filter(Boolean);
+          await plugin.saveSettings();
+        })
+    );
+
+    containerEl.createEl("h3", { text: "Templates" });
+
+    new Setting(containerEl).setName("Frontmatter template").setDesc(
+      "Custom YAML frontmatter used by 'Update workout metrics in frontmatter' " +
+        "and 'Generate Next Workout'. One key: value per line. Supported " +
+        "variables: {{date}}, {{total_volume}}, {{total_volume_unit}}, " +
+        "{{completed_sets}}, {{total_sets}}, {{total_reps}}, " +
+        "{{exercises_completed}}, {{session_duration}}, " +
+        "{{session_duration_seconds}}, {{last_updated}}, {{previous_workout}}, " +
+        "{{workout_name}}. Leave empty for the default."
+    ).addTextArea((area) =>
+      area
+        .setPlaceholder(DEFAULT_FRONTMATTER_TEMPLATE)
+        .setValue(settings.frontmatterTemplate || DEFAULT_FRONTMATTER_TEMPLATE)
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.frontmatterTemplate = value;
+          await plugin.saveSettings();
+        })
+    );
+
+    new Setting(containerEl).setName("Workout filename template").setDesc(
+      "Default file name for generated workout reports. Supported variables: " +
+        "{{date}} (YYYY-MM-DD), {{time}} (HH-MM), {{workout_name}}. The .md " +
+        "extension is appended automatically. Leave empty for the default " +
+        "'{{workout_name}}-{{date}}'."
+    ).addText((text) =>
+      text
+        .setPlaceholder(DEFAULT_FILENAME_TEMPLATE)
+        .setValue(settings.workoutFilenameTemplate || DEFAULT_FILENAME_TEMPLATE)
+        .onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.workoutFilenameTemplate = value;
           await plugin.saveSettings();
         })
     );

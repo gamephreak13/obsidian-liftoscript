@@ -86,7 +86,7 @@ Open a note containing a ````liftoscript```` block in **Reading** view. Each exe
 
 ## Autocomplete
 
-While editing a note, type an exercise name after a `/` or list marker (`-`, `*`, `+`), or at the start of a line. A dropdown of **211 built-in exercise names** appears; pick one to insert it.
+While editing a note, type an exercise name after a `/` or list marker (`-`, `*`, `+`), or at the start of a line. A dropdown of exercise names from the **active database** appears; pick one to insert it. Choose between the **Native Liftosaur** database (227 entries) and the **Free Exercise DB** (876 entries) in Settings → Exercise database. With the Free Exercise DB active you can also search by muscle group or equipment (e.g. typing `chest` or `barbell`).
 
 ---
 

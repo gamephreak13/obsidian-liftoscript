@@ -1,6 +1,8 @@
 import { extractLiftoscriptBlocks, BLOCK_LANG } from "./summary";
 import { parseExerciseLine } from "./parser";
 import { computeNextExercise } from "./progression";
+import { renderFrontmatterBody, wrapFrontmatter } from "./frontmatter";
+import { formatTemplateDate } from "./template";
 
 /*
  * nextWorkout.ts
@@ -9,20 +11,15 @@ import { computeNextExercise } from "./progression";
  * It reads the liftoscript blocks of the previous workout, applies progressive
  * overload (lp) to any progression-tagged exercises, and produces a new note
  * with baseline YAML frontmatter and a backlink to the previous note.
+ * P28: the YAML frontmatter is rendered from the configurable template.
  */
 
 export interface NextWorkoutBuildInput {
   previousPath: string;
   previousText: string;
   previousTitle: string;
-}
-
-/** Format today's date as YYYY-MM-DD. */
-function today(): string {
-  const d = new Date();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${mm}-${dd}`;
+  /** Optional custom frontmatter template (settings.frontmatterTemplate). */
+  frontmatterTemplate?: string;
 }
 
 /** Serialize a non-progress line verbatim but with markers reset to "[ ]". */
@@ -32,7 +29,7 @@ function resetMarkers(line: string): string {
 }
 
 export function buildNextWorkoutContent(input: NextWorkoutBuildInput): string {
-  const date = today();
+  const date = formatTemplateDate(new Date());
   const previousLink = `[[${input.previousTitle}]]`;
 
   const blocks = extractLiftoscriptBlocks(input.previousText);
@@ -55,18 +52,25 @@ export function buildNextWorkoutContent(input: NextWorkoutBuildInput): string {
     return "```" + BLOCK_LANG + "\n" + nextLines.join("\n") + "\n```";
   });
 
-  const yaml = [
-    "---",
-    `date: ${date}`,
-    "total_volume: 0",
-    `total_volume_unit: lb`,
-    "completed_sets: 0",
-    "exercises_completed: 0",
-    "session_duration: 0:00",
-    "session_duration_seconds: 0",
-    `previous_workout: ${previousLink}`,
-    "---",
-  ].join("\n");
+  // P26/P28: render the baseline frontmatter from the configured template.
+  const frontmatterTemplate = input.frontmatterTemplate
+    ? input.frontmatterTemplate.trim()
+    : "";
+  const body = renderFrontmatterBody(frontmatterTemplate, {
+    total_volume: 0,
+    total_volume_unit: "lb",
+    completed_sets: 0,
+    total_sets: 0,
+    total_reps: 0,
+    exercises_completed: 0,
+    session_duration: "0:00",
+    session_duration_seconds: 0,
+    last_updated: new Date().toISOString(),
+  }, {
+    previous_workout: previousLink,
+    workout_name: input.previousTitle,
+  });
+  const yaml = wrapFrontmatter(body);
 
   const parts = [
     yaml,

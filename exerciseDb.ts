@@ -1,55 +1,155 @@
-import { App, Editor, EditorPosition, EditorSuggest, EditorSuggestContext, EditorSuggestTriggerInfo } from "obsidian";
-import exerciseData from "./exercises.json";
+import nativeData from "./exercises.json";
+import freeData from "./freeExercises.json";
 
 /*
- * exerciseDb.ts
+ * P21-P24: centralized exercise database registry. Two datasets are bundled
+ * locally (both shipped in the plugin):
+ *   - nativeData (exercises.json)      - the Native Liftosaur database
+ *   - freeData   (freeExercises.json)  - the open-source Free Exercise DB
+ *     (https://github.com/yuhonas/free-exercise-db, distilled to the fields the
+ *     plugin needs and compacted to keep the bundle small).
  *
- * Static exercise database (loaded from exercises.json) plus an EditorSuggest
- * that provides an autocomplete dropdown for exercise names while typing inside
- * the editor.
+ * The active dataset is chosen at runtime via setActiveDatabase() (P22) and all
+ * lookups read from it. Free Exercise DB records use a different schema (P23),
+ * so normalizeFreeExercise() maps them onto the native Exercise shape: name
+ * stays the primary identifier and the muscles/category are preserved for
+ * search + stretch/strength parser logic.
+ *
+ * NOTE: this module deliberately does NOT import "obsidian" so it stays usable
+ * from the Templater API bundle (which runs Obsidian-free under Node).
  */
 
+export type DatabaseId = "native" | "free" | "free-remote";
+
+export const DATABASE_LABELS: Record<DatabaseId, string> = {
+  native: "Native Liftosaur",
+  free: "Free Exercise DB (Local)",
+  "free-remote": "Free Exercise DB (Remote)",
+};
+
+/** A normalized exercise record. Free-DB-only fields are optional extras. */
 export interface Exercise {
   id: string;
   name: string;
   equipment: string;
   category?: "stretch" | "strength" | string;
+  /** Primary muscles the exercise targets (Free Exercise DB). */
+  primaryMuscles?: string[];
+  /** Secondary / supporting muscles (Free Exercise DB). */
+  secondaryMuscles?: string[];
 }
 
-let EXERCISES: Exercise[] = exerciseData as Exercise[];
-
-export function getExercises(): Exercise[] {
-  return EXERCISES;
+interface FreeExerciseRecord {
+  id?: unknown;
+  name: string;
+  equipment?: string;
+  category?: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
 }
 
 /**
- * Replace the active exercise database with a custom one (P18: custom JSON
- * import). Entries may override an existing exercise by matching id (or name)
- * or be appended when no match exists. Pass an empty array to restore the
- * built-in database.
+ * P23: normalize a Free Exercise DB record onto the native Exercise schema.
+ *   - name is the primary identifier (unchanged, canonical casing).
+ *   - primaryMuscles / secondaryMuscles are carried through for search.
+ *   - category "stretching" is mapped to "stretch" so the parser's stretch
+ *     detection (which keys on category === "stretch") treats Free-DB stretches
+ *     the same as native ones; "strength" and the other free categories stay as
+ *     strength-like.
  */
-export function setCustomExercises(custom: Array<Record<string, unknown>>): void {
-  if (!custom || custom.length === 0) {
-    EXERCISES = exerciseData as Exercise[];
-    return;
+export function normalizeFreeExercise(record: FreeExerciseRecord): Exercise {
+  const name = typeof record?.name === "string" ? record.name : "";
+  return {
+    id:
+      typeof record?.id === "string"
+        ? record.id
+        : name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name,
+    equipment: typeof record?.equipment === "string" ? record.equipment : "",
+    category:
+      record?.category === "stretching"
+        ? "stretch"
+        : typeof record?.category === "string"
+          ? record.category
+          : undefined,
+    primaryMuscles: Array.isArray(record?.primaryMuscles)
+      ? record.primaryMuscles
+      : [],
+    secondaryMuscles: Array.isArray(record?.secondaryMuscles)
+      ? record.secondaryMuscles
+      : [],
+  };
+}
+
+const NATIVE_EXERCISES = nativeData as Exercise[];
+const FREE_EXERCISES = (freeData as FreeExerciseRecord[]).map(normalizeFreeExercise);
+
+let activeDatabase: DatabaseId = "free";
+let customOverrides: Record<string, unknown>[] = [];
+let remoteFreeExercises: Exercise[] | null = null;
+
+/** Set which database is active (P22). "free" swaps stretch detection, too. */
+export function setActiveDatabase(id: DatabaseId): void {
+  activeDatabase = id;
+}
+
+/** The currently active database id. */
+export function getActiveDatabase(): DatabaseId {
+  return activeDatabase;
+}
+
+/**
+ * Store the fetched Free Exercise DB records (P29 remote). Populating this
+ * enables the "free-remote" mode; leaving it null/empty keeps the bundled
+ * local copy as the offline fallback.
+ */
+export function setFreeRemoteExercises(records: Array<Record<string, unknown>>): void {
+  remoteFreeExercises = records.map((r) => normalizeFreeExercise(r as unknown as FreeExerciseRecord));
+}
+
+/** The raw (non-merged) active dataset. */
+export function getBaseExercises(): Exercise[] {
+  if (activeDatabase === "free-remote") {
+    // Fall back to the bundled local Free DB when remote isn't available yet
+    // or a fetch previously failed.
+    return remoteFreeExercises && remoteFreeExercises.length > 0
+      ? remoteFreeExercises
+      : FREE_EXERCISES;
   }
-  const merged: Exercise[] = (exerciseData as Exercise[]).slice();
+  return activeDatabase === "free" ? FREE_EXERCISES : NATIVE_EXERCISES;
+}
+
+export function getExercises(): Exercise[] {
+  const base = getBaseExercises();
+  if (customOverrides.length === 0) {
+    return base;
+  }
+  const merged = base.slice();
   const indexByName = new Map<string, number>();
   merged.forEach((e, i) => {
     if (e?.name) {
       indexByName.set(e.name.toLowerCase(), i);
     }
   });
-  for (const raw of custom) {
-    const name = typeof raw.name === "string" ? raw.name : "";
+  for (const raw of customOverrides) {
+    const name = typeof raw?.name === "string" ? raw.name : "";
     if (!name) {
       continue;
     }
+    const category =
+      typeof raw?.category === "string"
+        ? raw.category === "stretching"
+          ? "stretch"
+          : raw.category
+        : undefined;
     const exercise: Exercise = {
-      id: typeof raw.id === "string" ? raw.id : name.toLowerCase().replace(/\s+/g, "-"),
+      id: typeof raw?.id === "string" ? raw.id : name.toLowerCase().replace(/\s+/g, "-"),
       name,
-      equipment: typeof raw.equipment === "string" ? raw.equipment : "",
-      category: typeof raw.category === "string" ? raw.category : undefined,
+      equipment: typeof raw?.equipment === "string" ? raw.equipment : "",
+      category,
+      primaryMuscles: Array.isArray(raw?.primaryMuscles)
+        ? raw.primaryMuscles as string[]
+        : undefined,
     };
     const existingIdx = indexByName.get(name.toLowerCase());
     if (existingIdx != null) {
@@ -59,9 +159,18 @@ export function setCustomExercises(custom: Array<Record<string, unknown>>): void
       merged.push(exercise);
     }
   }
-  EXERCISES = merged;
+  return merged;
 }
 
+/**
+ * P18: merge a custom JSON database (overrides by name) on top of the active
+ * dataset. Pass an empty array to clear the custom overrides.
+ */
+export function setCustomExercises(custom: Array<Record<string, unknown>>): void {
+  customOverrides = custom;
+}
+
+/** Find an exercise by its (case-insensitive) name in the active dataset. */
 export function findExercise(raw: string): Exercise | undefined {
   const name = raw
     .split("/")[0]
@@ -70,72 +179,9 @@ export function findExercise(raw: string): Exercise | undefined {
   return getExercises().find((e) => e.name.toLowerCase() === name.toLowerCase());
 }
 
-/* ------------------------------------------------------------------ */
-/* EditorSuggest for exercise names                                    */
-/* ------------------------------------------------------------------ */
-
-interface Suggestion extends Exercise {
-  match: number;
-}
-
-export class ExerciseSuggest extends EditorSuggest<Suggestion> {
-  constructor(app: App) {
-    super(app);
-  }
-
-  getSuggestions(context: EditorSuggestContext): Suggestion[] {
-    const query = context.query.toLowerCase();
-    if (!query) {
-      return [];
-    }
-    return getExercises()
-      .map((e) => {
-        const lower = e.name.toLowerCase();
-        const idx = lower.indexOf(query);
-        if (idx === -1) {
-          return undefined;
-        }
-        return { ...e, match: idx };
-      })
-      .filter((e): e is Suggestion => e != null)
-      .sort((a, b) => a.match - b.match || a.name.length - b.name.length)
-      .slice(0, 10);
-  }
-
-  renderSuggestion(suggestion: Suggestion, el: HTMLElement): void {
-    const container = el.createDiv({ cls: "liftoscript-suggestion" });
-    container.createDiv({ text: suggestion.name, cls: "liftoscript-suggestion-name" });
-    container.createDiv({ text: suggestion.equipment, cls: "liftoscript-suggestion-equipment" });
-  }
-
-  selectSuggestion(suggestion: Suggestion, evt: MouseEvent | KeyboardEvent): void {
-    if (!this.context) {
-      return;
-    }
-    const editor = this.context.editor;
-    const start = this.context.start;
-    editor.replaceRange(suggestion.name, start, this.context.end);
-    editor.setCursor({
-      line: start.line,
-      ch: start.ch + suggestion.name.length,
-    });
-  }
-
-  onTrigger(cursor: EditorPosition, editor: Editor, file: unknown): EditorSuggestTriggerInfo | null {
-    const line = editor.getLine(cursor.line);
-    const upToCursor = line.slice(0, cursor.ch);
-
-    // Trigger when typing after a bullet/list dash or after a "/" separator.
-    const match = upToCursor.match(/(?:\/|^|\s|[-*+])\s*([A-Za-z][A-Za-z0-9 _\-']*)$/);
-    if (!match) {
-      return null;
-    }
-    const query = match[1];
-    const startCh = cursor.ch - query.length;
-    return {
-      start: { line: cursor.line, ch: startCh },
-      end: cursor,
-      query,
-    };
-  }
+/** True when the given exercise name is a stretch in the active dataset. */
+export function isStretchName(name: string): boolean {
+  return getExercises().some(
+    (e) => e.category === "stretch" && e.name.toLowerCase() === name.trim().toLowerCase()
+  );
 }

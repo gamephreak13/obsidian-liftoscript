@@ -1,12 +1,15 @@
 import { App, TFile } from "obsidian";
 import { summarizeWorkoutText, WorkoutSummary } from "./summary";
+import { renderTemplate, formatTemplateDate, TemplateContext } from "./template";
 
 /*
  * frontmatter.ts
  *
- * P10: injects the computed workout metrics into the note's YAML frontmatter
- * using Obsidian's app.fileManager.processFrontMatter(). Keys are shaped for
- * easy Dataview queries: total_volume, completed_sets, session_duration, etc.
+ * P10 + P26: injects the computed workout metrics into the note's YAML
+ * frontmatter. P26 refactors the generation to render a user-defined template
+ * (settings.frontmatterTemplate) instead of a hardcoded YAML structure, while
+ * the default template below preserves the original, Dataview-friendly keys
+ * (total_volume, completed_sets, session_duration, ...).
  */
 
 /** Format seconds as "MM:SS" (or "H:MM:SS" if >= 1 hour). */
@@ -46,17 +49,57 @@ export function buildMetrics(summary: WorkoutSummary): FrontmatterMetrics {
   };
 }
 
+/**
+ * Build the variable context available to the frontmatter template. Returns the
+ * shared metric keys plus note-specific ones (date, previous_workout,
+ * workout_name) the caller can override.
+ */
+export function buildFrontmatterContext(
+  metrics: FrontmatterMetrics,
+  extras: TemplateContext = {}
+): TemplateContext {
+  return {
+    date: formatTemplateDate(new Date()),
+    ...(metrics as unknown as TemplateContext),
+    ...extras,
+  };
+}
+
+/** Render the YAML body (between the `---` fences) from a template. */
+export function renderFrontmatterBody(
+  template: string,
+  metrics: FrontmatterMetrics,
+  extras: TemplateContext = {}
+): string {
+  return renderTemplate(template, buildFrontmatterContext(metrics, extras)).trim();
+}
+
+/** Wrap a rendered body in YAML frontmatter fences. */
+export function wrapFrontmatter(body: string): string {
+  return `---\n${body}\n---`;
+}
+
+/** Replace the leading YAML frontmatter of `text` with `block`, or prepend it. */
+export function replaceFrontmatter(text: string, block: string): string {
+  const t = text.replace(/^\uFEFF/, "");
+  const hasFrontmatter = /^---\n/.test(t);
+  if (hasFrontmatter) {
+    const rest = t.replace(/^---\n[\s\S]*?\n---\s*\n?/, "");
+    return (block + "\n" + rest).replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  }
+  return (block + "\n\n" + t).replace(/^\s+/, "");
+}
+
 export async function updateWorkoutFrontmatter(
   app: App,
   file: TFile,
-  text: string
+  text: string,
+  template?: string
 ): Promise<void> {
   const summary = summarizeWorkoutText(text);
   const metrics = buildMetrics(summary);
+  const body = renderFrontmatterBody(template ?? "", metrics, {});
+  const block = wrapFrontmatter(body);
 
-  await app.fileManager.processFrontMatter(file, (frontmatter) => {
-    for (const [key, value] of Object.entries(metrics)) {
-      frontmatter[key] = value;
-    }
-  });
+  await app.vault.process(file, (current) => replaceFrontmatter(current, block));
 }
