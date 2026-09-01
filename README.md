@@ -126,7 +126,7 @@ Everything lives under **Settings → Liftoscript**:
 | --- | --- |
 | **Workout folder** | Directory where **Generate Next Workout** writes files (created automatically if missing). Empty = same folder as the active note. |
 | **Default body weight** | Body weight used to compute bodyweight-set volume. |
-| **Append inline to daily note** | Append the generated workout to the active daily note instead of a separate file. |
+| **Append inline to current note** | Append the generated workout to the active current note instead of a separate file. |
 | **Active exercise database** | Choose **Native Liftosaur** (227) or **Free Exercise DB** (876) for autocomplete + card info. |
 | **Free Exercise DB remote URL** / **Refresh remote database** | Point at a custom Free Exercise DB JSON and refresh the bundled copy. |
 | **Custom exercise database** | Path to a JSON file to override/merge the active database (applied on save). |

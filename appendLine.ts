@@ -4,8 +4,8 @@
  * Pure string helpers for routing generated liftoscript lines into a note:
  *   - insertLineIntoLastBlock: put a line inside the last ```liftoscript fence,
  *     or append a fresh fence if none exists.
- *   - stripFrontmatter: drop leading YAML so an inline daily-note append gets
- *     only the workout body.
+ *   - stripFrontmatter: drop leading YAML so an inline append to the current
+ *     note gets only the workout body.
  */
 
 /** Insert a line into the last ```liftoscript block, or append a new one. */
