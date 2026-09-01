@@ -42,6 +42,8 @@ export default class LiftoscriptPlugin extends Plugin {
 			void this.applyRemoteDatabase(true);
 		}));
 
+		this.addRibbonIcon("dumbbell", "Log exercise", () => this.openLogModal());
+
 		this.registerButtonCommands();
 
 		this.registerEditorSuggest(new ExerciseSuggest(this.app));
@@ -71,6 +73,17 @@ export default class LiftoscriptPlugin extends Plugin {
 		registerLiftoscriptPostProcessor(this, callbacks);
 
 		this.registerEvent(this.app.workspace.on("file-open", () => this.refreshFAB()));
+
+		this.registerEvent(
+			this.app.workspace.on("editor-menu", (menu, editor, view) => {
+				menu.addItem((item) => {
+					item
+						.setTitle("Log exercise")
+						.setIcon("dumbbell")
+						.onClick(() => this.openLogModal());
+				});
+			})
+		);
 
 		this.addCommand({
 			id: "update-workout-metrics",
@@ -319,7 +332,7 @@ export default class LiftoscriptPlugin extends Plugin {
 
 		const fab = document.createElement("button");
 		fab.type = "button";
-		fab.className = "liftoscript-fab";
+		fab.className = `liftoscript-fab liftoscript-fab-${this.settings.fabPosition}`;
 		fab.setAttribute("aria-label", "Log exercise");
 		setIcon(fab, "dumbbell");
 		fab.addEventListener("click", () => this.openLogModal());

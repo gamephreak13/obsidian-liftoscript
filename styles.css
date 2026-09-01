@@ -195,8 +195,6 @@
 
 .liftoscript-fab {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
   z-index: var(--layer-popover);
   width: 3.5rem;
   height: 3.5rem;
@@ -211,6 +209,26 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.liftoscript-fab-bottom-right {
+  right: 1rem;
+  bottom: 1rem;
+}
+
+.liftoscript-fab-bottom-left {
+  left: 1rem;
+  bottom: 1rem;
+}
+
+.liftoscript-fab-top-right {
+  right: 1rem;
+  top: 1rem;
+}
+
+.liftoscript-fab-top-left {
+  left: 1rem;
+  top: 1rem;
 }
 
 .liftoscript-fab svg {

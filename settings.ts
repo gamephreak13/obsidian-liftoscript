@@ -11,7 +11,7 @@ export { exerciseNameFromLine } from "./exerciseDb";
  * P18 + P22 + P25 + P27: plugin settings tab. Exposes:
  *   1. workoutFolder        - directory where "Generate Next Workout" writes files
  *   2. appendToDailyNote    - append the generated workout inline to the active
- *                             daily note instead of creating a separate file
+ *                             note instead of creating a separate file
  *   3. customExerciseDb     - path to a JSON file overriding/merging the active
  *                             exercise database (applied on save)
  *   4. activeExerciseDb     - dropdown choosing "Native Liftosaur" or
@@ -28,7 +28,8 @@ export interface LiftoscriptSettings {
   freeExerciseRemoteUrl: string;
   frontmatterTemplate: string;
   workoutFilenameTemplate: string;
-  fabMode: "mobile" | "desktop" | "both";
+  fabMode: "disabled" | "mobile" | "desktop" | "both";
+  fabPosition: "bottom-right" | "bottom-left" | "top-right" | "top-left";
   fabRestrictToFolders: boolean;
   fabFolders: string[];
   buttonTemplates: string[];
@@ -65,7 +66,8 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   freeExerciseRemoteUrl: DEFAULT_FREE_DB_URL,
   frontmatterTemplate: DEFAULT_FRONTMATTER_TEMPLATE,
   workoutFilenameTemplate: DEFAULT_FILENAME_TEMPLATE,
-  fabMode: "mobile",
+  fabMode: "disabled",
+  fabPosition: "bottom-right",
   fabRestrictToFolders: false,
   fabFolders: [],
   buttonTemplates: [
@@ -339,8 +341,9 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Floating action button").setDesc(
       "A quick-entry FAB that opens the Log exercise modal. Choose which " +
-        "platforms should show it."
+        "platforms should show it, or Disabled to keep it off."
     ).addDropdown((dd) => {
+      dd.addOption("disabled", "Disabled");
       dd.addOption("mobile", "Mobile Only");
       dd.addOption("desktop", "Desktop Only");
       dd.addOption("both", "Both");
@@ -349,6 +352,23 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
         const v = value as LiftoscriptSettings["fabMode"];
         const plugin = this.plugin();
         plugin.settings.fabMode = v;
+        await plugin.saveSettings();
+      });
+    });
+
+    new Setting(containerEl).setName("FAB position").setDesc(
+      "Where the floating action button is placed. Move it away from editor " +
+        "controls it may cover."
+    ).addDropdown((dd) => {
+      dd.addOption("bottom-right", "Bottom Right");
+      dd.addOption("bottom-left", "Bottom Left");
+      dd.addOption("top-right", "Top Right");
+      dd.addOption("top-left", "Top Left");
+      dd.setValue(settings.fabPosition);
+      dd.onChange(async (value) => {
+        const v = value as LiftoscriptSettings["fabPosition"];
+        const plugin = this.plugin();
+        plugin.settings.fabPosition = v;
         await plugin.saveSettings();
       });
     });
