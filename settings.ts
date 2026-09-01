@@ -248,9 +248,9 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
       });
     });
 
-    new Setting(containerEl).setName("Append inline to daily note").setDesc(
+    new Setting(containerEl).setName("Append inline to current note").setDesc(
       "When enabled, 'Generate Next Workout' appends the generated workout " +
-        "block to the active daily note instead of creating a separate file."
+        "block to the active current note instead of creating a separate file."
     ).addToggle((toggle) =>
       toggle
         .setValue(settings.appendToDailyNote)
