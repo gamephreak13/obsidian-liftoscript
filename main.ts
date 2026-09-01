@@ -335,7 +335,11 @@ export default class LiftoscriptPlugin extends Plugin {
 		fab.type = "button";
 		fab.className = `liftoscript-fab liftoscript-fab-${this.settings.fabPosition}`;
 		fab.setAttribute("aria-label", "Log exercise");
-		setIcon(fab, "dumbbell");
+		fab.setAttribute("title", "Log exercise");
+		const icon = fab.createDiv({ cls: "liftoscript-fab-icon" });
+		setIcon(icon, "dumbbell");
+		const label = fab.createDiv({ cls: "liftoscript-fab-label" });
+		label.textContent = "Log";
 		fab.addEventListener("click", () => this.openLogModal());
 		target.appendChild(fab);
 		this.fabEl = fab;

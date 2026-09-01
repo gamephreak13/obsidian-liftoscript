@@ -1,22 +1,16 @@
-import {
-  App,
-  ButtonComponent,
-  DropdownComponent,
-  Modal,
-  Notice,
-  Setting,
-  TextComponent,
-} from "obsidian";
+import { App, ButtonComponent, Modal, Notice, setIcon } from "obsidian";
 import { getExercises } from "./exerciseDb";
 import { parseExerciseLine } from "./parser";
 
 /*
  * inputModal.ts
  *
- * P14: a touch-optimized modal for logging a single exercise. Every field is a
- * large quick-tap control (steppers + native dropdown) so a set can be added
- * fast on mobile. On submit it emits one liftoscript line and calls the
- * callback (the caller appends it to the active note / inserts at the cursor).
+ * A single quick-log modal used by the FAB, the ribbon icon, the editor-menu
+ * item and the "Log exercise" command. It emits one liftoscript line and calls
+ * the onSubmit callback (the caller appends it to the active note). The layout
+ * is deliberately cohesive: every control is the same height and size, and the
+ * strength/stretch sections swap in and out without changing the overall shape
+ * of the modal.
  */
 
 export interface LogExerciseResult {
@@ -39,7 +33,8 @@ export interface InputModalOptions {
 
 type Kind = "strength" | "stretch";
 
-/** A +/- stepper with large touch targets. */
+/** A +/- stepper with large touch targets and an optional compact variant
+ *  used for the per-set weight controls so many sets still fit. */
 class Stepper {
   el: HTMLDivElement;
   private valueEl: HTMLSpanElement;
@@ -56,6 +51,7 @@ class Stepper {
       min: number;
       max: number;
       label: string;
+      compact?: boolean;
       onChange: (v: number) => void;
     }
   ) {
@@ -66,12 +62,13 @@ class Stepper {
     this.onChange = opts.onChange;
 
     this.el = document.createElement("div");
-    this.el.className = "liftoscript-stepper";
+    this.el.className = "liftoscript-stepper" + (opts.compact ? " liftoscript-stepper-compact" : "");
 
     const minus = document.createElement("button");
     minus.type = "button";
     minus.className = "liftoscript-stepper-btn";
     minus.textContent = "−";
+    minus.setAttribute("aria-label", `${opts.label}: decrease`);
     minus.addEventListener("click", () => this.decrement());
 
     const labelEl = document.createElement("div");
@@ -86,6 +83,7 @@ class Stepper {
     plus.type = "button";
     plus.className = "liftoscript-stepper-btn liftoscript-stepper-btn-plus";
     plus.textContent = "+";
+    plus.setAttribute("aria-label", `${opts.label}: increase`);
     plus.addEventListener("click", () => this.increment());
 
     this.el.append(minus, labelEl, this.valueEl, plus);
@@ -111,19 +109,192 @@ class Stepper {
   }
 }
 
+/** A slider + editable number control for a time value. The slider makes large
+ *  adjustments easy. The value displays as a large, unclipped number (a span,
+ *  so its size is reliable across browsers/themes) that swaps to a native
+ *  number input on tap for exact entry. */
+class SliderField {
+  el: HTMLDivElement;
+  private slider: HTMLInputElement;
+  private numberBox: HTMLDivElement;
+  private numberSpan: HTMLSpanElement;
+  private numberInput: HTMLInputElement | null = null;
+  private readonly min: number;
+  private readonly max: number;
+  private readonly step: number;
+  private readonly onChange: (v: number) => void;
+
+  constructor(
+    opts: {
+      initial: number;
+      min: number;
+      max: number;
+      step: number;
+      onChange: (v: number) => void;
+    }
+  ) {
+    this.min = opts.min;
+    this.max = opts.max;
+    this.step = opts.step;
+    this.onChange = opts.onChange;
+
+    this.el = document.createElement("div");
+    this.el.className = "liftoscript-slider";
+
+    this.slider = document.createElement("input");
+    this.slider.type = "range";
+    this.slider.className = "liftoscript-slider-range";
+    this.slider.min = String(opts.min);
+    this.slider.max = String(opts.max);
+    this.slider.step = String(opts.step);
+    this.slider.value = String(opts.initial);
+
+    this.numberBox = document.createElement("div");
+    this.numberBox.className = "liftoscript-slider-number";
+
+    this.numberSpan = document.createElement("span");
+    this.numberSpan.className = "liftoscript-slider-number-value";
+    this.numberSpan.textContent = String(opts.initial);
+    this.numberSpan.setAttribute("role", "button");
+    this.numberSpan.setAttribute("tabindex", "0");
+    this.numberSpan.setAttribute("aria-label", "Edit seconds");
+    this.numberSpan.addEventListener("click", () => this.startEditing());
+    this.numberSpan.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        this.startEditing();
+      }
+    });
+
+    this.numberBox.appendChild(this.numberSpan);
+    this.numberBox.addEventListener("click", () => this.startEditing());
+
+    this.slider.addEventListener("input", () => {
+      const v = parseInt(this.slider.value, 10);
+      if (!Number.isNaN(v)) {
+        this.setDisplay(v);
+        this.onChange(v);
+      }
+    });
+
+    const arrows = document.createElement("div");
+    arrows.className = "liftoscript-slider-arrows";
+    this.arrow(true, arrows);
+    this.arrow(false, arrows);
+
+    this.el.append(this.slider, this.numberBox, arrows);
+  }
+
+  /** Render the value into the display span (and slider). */
+  private setDisplay(v: number): void {
+    this.numberSpan.textContent = String(v);
+    this.slider.value = String(v);
+  }
+
+  /** Swap the big span for a native number input to edit the exact value. */
+  private startEditing(): void {
+    if (this.numberInput) {
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "number";
+    input.className = "liftoscript-slider-number-input";
+    input.min = String(this.min);
+    input.max = String(this.max);
+    input.step = String(this.step);
+    input.value = String(this.getValue());
+    input.setAttribute("inputmode", "numeric");
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.commitEditing();
+      } else if (e.key === "Escape") {
+        this.cancelEditing();
+      }
+    });
+    input.addEventListener("blur", () => this.commitEditing());
+
+    this.numberBox.empty();
+    this.numberBox.appendChild(input);
+    this.numberInput = input;
+    input.focus();
+    input.select();
+  }
+
+  /** Commit the edited value and return to the big span display. */
+  private commitEditing(): void {
+    const input = this.numberInput;
+    if (!input) {
+      return;
+    }
+    const raw = parseInt(input.value, 10);
+    const v = Number.isNaN(raw) ? this.min : clamp(raw, this.min, this.max);
+    this.numberInput = null;
+    this.numberBox.empty();
+    this.numberBox.appendChild(this.numberSpan);
+    this.setDisplay(v);
+    this.onChange(v);
+  }
+
+  /** Abandon editing and restore the previous displayed value. */
+  private cancelEditing(): void {
+    this.numberInput = null;
+    this.numberBox.empty();
+    this.numberBox.appendChild(this.numberSpan);
+  }
+
+  /** A fine-tune step button shown as an arrow head (chevron). */
+  private arrow(up: boolean, parent: HTMLDivElement): void {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "liftoscript-slider-arrow";
+    btn.setAttribute(
+      "aria-label",
+      up ? `Increase by ${this.step}` : `Decrease by ${this.step}`
+    );
+    const points = up ? "6 15 12 9 18 15" : "6 9 12 15 18 9";
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ' +
+      'aria-hidden="true">' +
+      '<polyline points="' + points + '"></polyline></svg>';
+    btn.addEventListener("click", () => {
+      const next = clamp(this.getValue() + (up ? 1 : -1) * this.step, this.min, this.max);
+      this.setValue(next);
+      this.onChange(next);
+    });
+    parent.appendChild(btn);
+  }
+
+  getValue(): number {
+    return parseInt(this.numberSpan.textContent ?? String(this.slider.value), 10);
+  }
+
+  setValue(v: number): void {
+    const clamped = clamp(v, this.min, this.max);
+    this.setDisplay(clamped);
+  }
+}
+
+/** Clamp a value into the inclusive [min, max] range. */
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}
+
 export class LogExerciseModal extends Modal {
   private readonly opts: InputModalOptions;
-  private nameDropdown: DropdownComponent | null = null;
-  private customName: TextComponent | null = null;
-  private kindDropdown: DropdownComponent | null = null;
+  private nameInput: HTMLInputElement | null = null;
+  private kindStrength: HTMLButtonElement | null = null;
+  private kindStretch: HTMLButtonElement | null = null;
   private sets: Stepper | null = null;
   private reps: Stepper | null = null;
   private weightSteppers: Stepper[] = [];
   private weightFields: HTMLDivElement | null = null;
-  private weightUnit: DropdownComponent | null = null;
-  private hold: Stepper | null = null;
-  private stretchRest: Stepper | null = null;
-  private rest: Stepper | null = null;
+  private weightUnit: HTMLSelectElement | null = null;
+  private hold: SliderField | null = null;
+  private stretchRest: SliderField | null = null;
+  private rest: SliderField | null = null;
   private strengthFields: HTMLDivElement | null = null;
   private stretchFields: HTMLDivElement | null = null;
   private editingMarkers: string[] | null = null;
@@ -143,88 +314,106 @@ export class LogExerciseModal extends Modal {
     contentEl.empty();
     contentEl.className += " liftoscript-modal";
 
-    new Setting(contentEl).setName(this.opts.editing ? "Edit exercise" : "Exercise").setHeading();
+    const header = contentEl.createDiv({ cls: "liftoscript-modal-header" });
+    header.createEl("h2", { text: this.opts.editing ? "Edit exercise" : "Log exercise" });
 
-    // Exercise name: a native dropdown of built-in exercises plus an optional
-    // custom-name text field (larger, tap-friendly).
-    const nameSetting = new Setting(contentEl)
-      .setName("Name")
-      .setDesc("Pick from the list or type a custom name below.");
-    nameSetting.addDropdown((dd) => {
-      this.nameDropdown = dd;
-      const exercises = getExercises();
-      const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
-      dd.addOption("", "— Select exercise —");
-      sorted.forEach((e) => dd.addOption(e.name, e.name));
-      if (this.opts.initialName) {
-        const exact = sorted.some((e) => e.name.toLowerCase() === (this.opts.initialName as string).toLowerCase());
-        if (exact) {
-          dd.setValue(this.opts.initialName);
-        }
-      }
-      dd.selectEl.addClass("liftoscript-touch");
-    });
+    // Exercise name: a single text box with native autocomplete from the active
+    // database, so picking and typing a custom name share one control.
+    const nameField = this.field(contentEl, "Exercise");
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "liftoscript-input";
+    nameInput.setAttribute("list", "liftoscript-exercise-datalist");
+    nameInput.placeholder = "Type or pick an exercise…";
+    nameInput.autocomplete = "off";
+    nameField.control.appendChild(nameInput);
+    this.nameInput = nameInput;
 
-    new Setting(contentEl).setName("Custom name").setDesc(
-      "Optional. If set, this overrides the dropdown selection."
-    ).addText((text) => {
-      this.customName = text;
-      text.inputEl.addClass("liftoscript-touch");
-      return text;
-    });
+    const datalist = document.createElement("datalist");
+    datalist.id = "liftoscript-exercise-datalist";
+    const exercises = getExercises();
+    const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
+    for (const e of sorted) {
+      const opt = document.createElement("option");
+      opt.value = e.name;
+      datalist.appendChild(opt);
+    }
+    nameField.control.appendChild(datalist);
 
-    const kindSetting = new Setting(contentEl).setName("Type");
-    kindSetting.addDropdown((dd) => {
-      this.kindDropdown = dd;
-      dd.addOption("strength", "Strength (weighted sets)");
-      dd.addOption("stretch", "Stretch (timed hold)");
-      dd.onChange(() => this.refreshLayout());
+    // Type: a segmented Strength / Stretch selector.
+    const typeField = this.field(contentEl, "Type");
+    const seg = typeField.control.createDiv({ cls: "liftoscript-segmented" });
+    this.kindStrength = seg.createEl("button", {
+      cls: "liftoscript-segmented-btn is-active",
+      text: "Strength",
     });
+    this.kindStrength.type = "button";
+    this.kindStretch = seg.createEl("button", {
+      cls: "liftoscript-segmented-btn",
+      text: "Stretch",
+    });
+    this.kindStretch.type = "button";
+    this.kindStrength.addEventListener("click", () => this.setKind("strength"));
+    this.kindStretch.addEventListener("click", () => this.setKind("stretch"));
 
     // Strength fields
-    this.strengthFields = contentEl.createDiv({ cls: "liftoscript-modal-fields" });
+    this.strengthFields = contentEl.createDiv({ cls: "liftoscript-fields" });
+
+    const metricGrid = this.strengthFields.createDiv({ cls: "liftoscript-metric-grid" });
     this.sets = new Stepper({
       initial: 3, step: 1, min: 1, max: 12, label: "Sets",
       onChange: () => this.renderWeightSteppers(),
     });
-    this.strengthFields.appendChild(this.sets.el);
+    metricGrid.appendChild(this.sets.el);
     this.reps = new Stepper({
       initial: 5, step: 1, min: 0, max: 30, label: "Reps",
       onChange: () => {},
     });
-    this.strengthFields.appendChild(this.reps.el);
+    metricGrid.appendChild(this.reps.el);
 
-    const weightSetting = new Setting(this.strengthFields).setName("Weight per set");
-    this.weightFields = weightSetting.controlEl.createDiv({ cls: "liftoscript-weight-sets" });
-    weightSetting.addDropdown((dd) => {
-      this.weightUnit = dd;
-      dd.addOption("lb", "lb");
-      dd.addOption("kg", "kg");
-      dd.selectEl.addClass("liftoscript-touch");
+    const restField = this.field(this.strengthFields, "Rest");
+    this.rest = new SliderField({
+      initial: 90, step: 15, min: 0, max: 600,
+      onChange: () => {},
     });
+    restField.control.appendChild(this.rest.el);
+
+    const weightField = this.field(this.strengthFields, "Weight per set");
+    const unitRow = weightField.control.createDiv({ cls: "liftoscript-weight-head" });
+    unitRow.createDiv({ cls: "liftoscript-field-hint", text: "Pick the unit, then set each set's weight." });
+    this.weightUnit = document.createElement("select");
+    this.weightUnit.className = "liftoscript-select liftoscript-select-small";
+    const lb = document.createElement("option");
+    lb.value = "lb";
+    lb.textContent = "lb";
+    this.weightUnit.appendChild(lb);
+    const kg = document.createElement("option");
+    kg.value = "kg";
+    kg.textContent = "kg";
+    this.weightUnit.appendChild(kg);
+    unitRow.appendChild(this.weightUnit);
+
+    this.weightFields = weightField.control.createDiv({ cls: "liftoscript-weight-sets" });
     this.renderWeightSteppers();
 
-    const restSetting = new Setting(this.strengthFields).setName("Rest (s)");
-    this.rest = new Stepper({
-      initial: 90, step: 15, min: 0, max: 600, label: "Rest",
-      onChange: () => {},
-    });
-    restSetting.controlEl.appendChild(this.rest.el);
-
     // Stretch fields
-    this.stretchFields = contentEl.createDiv({ cls: "liftoscript-modal-fields" });
-    this.hold = new Stepper({
-      initial: 45, step: 5, min: 5, max: 300, label: "Hold (s)",
-      onChange: () => {},
-    });
-    this.stretchFields.appendChild(this.hold.el);
-    this.stretchRest = new Stepper({
-      initial: 15, step: 5, min: 0, max: 300, label: "Rest (s)",
-      onChange: () => {},
-    });
-    this.stretchFields.appendChild(this.stretchRest.el);
+    this.stretchFields = contentEl.createDiv({ cls: "liftoscript-fields" });
 
-    this.refreshLayout();
+    const holdField = this.field(this.stretchFields, "Hold (s)");
+    this.hold = new SliderField({
+      initial: 45, step: 5, min: 5, max: 300,
+      onChange: () => {},
+    });
+    holdField.control.appendChild(this.hold.el);
+
+    const stretchRestField = this.field(this.stretchFields, "Rest (s)");
+    this.stretchRest = new SliderField({
+      initial: 15, step: 5, min: 0, max: 300,
+      onChange: () => {},
+    });
+    stretchRestField.control.appendChild(this.stretchRest.el);
+
+    this.setKind("strength");
     if (this.opts.editing) {
       this.prefillFromExisting(this.opts.editing.raw);
     }
@@ -246,14 +435,32 @@ export class LogExerciseModal extends Modal {
     contentEl.empty();
   }
 
-  /** Show/hide fields based on the selected strength vs stretch type. */
-  private refreshLayout(): void {
-    const kind = (this.kindDropdown?.getValue() as Kind) ?? "strength";
+  /** A labelled form field: label row on top, control below. Consistent. */
+  private field(
+    parent: HTMLElement,
+    label: string,
+    hint?: string
+  ): { control: HTMLDivElement } {
+    const wrap = parent.createDiv({ cls: "liftoscript-field" });
+    const labelRow = wrap.createDiv({ cls: "liftoscript-field-label" });
+    labelRow.textContent = label;
+    if (hint) {
+      labelRow.title = hint;
+    }
+    const control = wrap.createDiv({ cls: "liftoscript-field-control" });
+    return { control };
+  }
+
+  /** Switch the visible section between strength and stretch. */
+  private setKind(kind: Kind): void {
+    const isStrength = kind === "strength";
+    this.kindStrength?.toggleClass("is-active", isStrength);
+    this.kindStretch?.toggleClass("is-active", !isStrength);
     if (this.strengthFields) {
-      this.strengthFields.style.display = kind === "strength" ? "" : "none";
+      this.strengthFields.style.display = isStrength ? "" : "none";
     }
     if (this.stretchFields) {
-      this.stretchFields.style.display = kind === "stretch" ? "" : "none";
+      this.stretchFields.style.display = isStrength ? "none" : "";
     }
   }
 
@@ -267,14 +474,16 @@ export class LogExerciseModal extends Modal {
     const previous = this.weightSteppers.map((s) => s.getValue());
     this.weightFields.empty();
     this.weightSteppers = [];
+    const compact = count > 3;
     for (let i = 0; i < count; i++) {
-      const label = count > 1 ? `Set ${i + 1} w.` : "Weight";
+      const label = count > 1 ? `${i + 1}` : "Weight";
       const stepper = new Stepper({
         initial: previous[i] ?? 100,
         step: 5,
         min: 0,
         max: 1000,
         label,
+        compact,
         onChange: () => {},
       });
       this.weightSteppers.push(stepper);
@@ -297,17 +506,12 @@ export class LogExerciseModal extends Modal {
     const ex = parseExerciseLine(raw);
     const name = ex.name.trim();
     if (name) {
-      const known = getExercises().some(
-        (e) => e.name.toLowerCase() === name.toLowerCase()
-      );
-      if (known) {
-        this.nameDropdown?.setValue(name);
-      } else {
-        this.customName?.setValue(name);
+      if (this.nameInput) {
+        this.nameInput.value = name;
       }
     }
     const kind: Kind = ex.isStretch ? "stretch" : "strength";
-    this.kindDropdown?.setValue(kind);
+    this.setKind(kind);
     if (ex.isStretch) {
       const first = ex.sets[0];
       this.sets?.setValue(ex.sets.length);
@@ -326,22 +530,17 @@ export class LogExerciseModal extends Modal {
           this.setWeightForSet(i, set.weight.value);
         }
       });
-      if (first && !first.isBodyweight && first.weight.unit) {
-        this.weightUnit?.setValue(first.weight.unit);
+      if (first && !first.isBodyweight && first.weight.unit && this.weightUnit) {
+        this.weightUnit.value = first.weight.unit;
       }
       if (ex.restSeconds > 0) {
         this.rest?.setValue(ex.restSeconds);
       }
     }
-    this.refreshLayout();
   }
 
   private resolveName(): string {
-    const custom = this.customName?.getValue()?.trim() ?? "";
-    if (custom) {
-      return custom;
-    }
-    return this.nameDropdown?.getValue()?.trim() ?? "";
+    return this.nameInput?.value?.trim() ?? "";
   }
 
   /** Build the log line, or null if invalid (name missing). */
@@ -349,16 +548,16 @@ export class LogExerciseModal extends Modal {
     const name = this.resolveName();
     if (!name) {
       new Notice("Enter an exercise name.");
+      this.nameInput?.focus();
       return null;
     }
-    const kind = (this.kindDropdown?.getValue() as Kind) ?? "strength";
+    const kind = this.kindStretch?.hasClass("is-active") ? "stretch" : "strength";
 
     if (kind === "stretch") {
       const sets = this.sets?.getValue() ?? 3;
       const hold = this.hold?.getValue() ?? 45;
       const rest = this.stretchRest?.getValue() ?? 15;
       const markers = this.applyMarkers(sets);
-      // Use a per-set rest via "hold|rest" when rest > 0, else a plain hold.
       const spec = rest > 0 ? `${sets}x${hold}s|${rest}s` : `${sets}x${hold}s`;
       const tag = isStretchName(name) ? "" : ", type: stretch";
       const progress = this.editingProgress;
@@ -371,7 +570,7 @@ export class LogExerciseModal extends Modal {
 
     const sets = this.sets?.getValue() ?? 3;
     const reps = this.reps?.getValue() ?? 5;
-    const unit = this.weightUnit?.getValue() ?? "lb";
+    const unit = this.weightUnit?.value ?? "lb";
     const rest = this.rest?.getValue() ?? 90;
     const markers = this.applyMarkers(sets);
     const tokens = Array.from(

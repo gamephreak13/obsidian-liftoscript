@@ -1,5 +1,408 @@
 /* Liftoscript - rendered workout UI */
 
+/* ---------------------------------------------------------------------------
+   Shared form primitives used across the quick-log and edit modals.
+   All interactive controls share the same height / tap target so the modals
+   feel consistent instead of a mix of drop-downs, steppers and inputs.
+--------------------------------------------------------------------------- */
+
+.liftoscript-input,
+.liftoscript-select,
+.liftoscript-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  color: var(--text-normal);
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.liftoscript-input,
+.liftoscript-select {
+  height: 2.75rem;
+  padding: 0 0.75rem;
+}
+
+.liftoscript-input:focus,
+.liftoscript-select:focus,
+.liftoscript-textarea:focus {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+  outline: none;
+}
+
+.liftoscript-modal {
+  --liftoscript-accent-soft: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+}
+
+/* Header */
+.liftoscript-modal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.25rem;
+}
+.liftoscript-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Field layout: label on its own row, control below, spaced out. */
+.liftoscript-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+.liftoscript-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.liftoscript-field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* A +/- stepper with large touch targets. The label uses flex:1 so the control
+   stretches to the grid cell it lives in, never the whole modal. */
+.liftoscript-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+  min-width: 0;
+}
+
+.liftoscript-stepper .liftoscript-stepper-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.liftoscript-stepper .liftoscript-stepper-value {
+  min-width: 3.5ch;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.liftoscript-stepper .liftoscript-stepper-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.liftoscript-stepper .liftoscript-stepper-btn:active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.liftoscript-stepper .liftoscript-stepper-btn-plus {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Compact steppers used for per-set weights when there are many sets. */
+.liftoscript-stepper-compact {
+  gap: 0.25rem;
+  padding: 0.2rem;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+}
+.liftoscript-stepper-compact .liftoscript-stepper-label {
+  flex: none;
+  font-size: 0.75rem;
+  text-align: center;
+}
+.liftoscript-stepper-compact .liftoscript-stepper-value {
+  font-size: 1.1rem;
+  min-width: 2ch;
+  order: -1;
+}
+.liftoscript-stepper-compact .liftoscript-stepper-btn {
+  width: 100%;
+  height: 1.9rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+}
+.liftoscript-stepper-compact .liftoscript-stepper-btn-plus {
+  border-radius: 8px;
+}
+
+/* Slider + number combo, used for Rest / Hold time values. The slider makes
+   large adjustments fast; the number field offers exact entry. */
+.liftoscript-slider {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.liftoscript-slider-range {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 0.5rem;
+  align-self: center;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+  cursor: pointer;
+  margin: 0;
+}
+
+.liftoscript-slider-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  border: 2px solid var(--background-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+.liftoscript-slider-range::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+.liftoscript-slider-range::-moz-range-thumb {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--interactive-accent);
+  border: 2px solid var(--background-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+.liftoscript-slider-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+}
+
+.liftoscript-slider-number {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+  height: 4rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.liftoscript-slider-number-value {
+  font-size: 3rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+}
+
+.liftoscript-slider .liftoscript-slider-number-input {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 3rem !important;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 0 !important;
+  margin: 0;
+  border: 2px solid transparent !important;
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--text-normal);
+  outline: none;
+  box-shadow: none !important;
+  -moz-appearance: textfield;
+}
+.liftoscript-slider .liftoscript-slider-number-input::-webkit-outer-spin-button,
+.liftoscript-slider .liftoscript-slider-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.liftoscript-slider .liftoscript-slider-number-input:focus {
+  border-color: var(--interactive-accent) !important;
+  background: var(--background-primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 25%, transparent) !important;
+}
+.liftoscript-slider-number:has(.liftoscript-slider-number-input) {
+  padding: 0;
+  background: transparent;
+}
+
+.liftoscript-slider-arrows {
+  flex: 0 0 2.25rem;
+  width: 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.liftoscript-slider-arrow {
+  width: 2.25rem;
+  flex: 1;
+  border: none;
+  border-radius: 6px;
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.liftoscript-slider-arrow svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+.liftoscript-slider-arrow:active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Sets/Reps/Hold/Rest share a two-column grid so they don't each span the width. */
+.liftoscript-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.5rem;
+}
+
+/* Per-set weight steppers in a responsive grid so many sets still fit. */
+.liftoscript-weight-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.liftoscript-field-hint {
+  font-size: 0.85rem;
+  color: var(--text-faint);
+}
+.liftoscript-select-small {
+  width: auto;
+  height: 2.1rem;
+  padding: 0 0.5rem;
+  border-radius: 6px;
+}
+.liftoscript-weight-sets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.liftoscript-weight-sets .liftoscript-stepper-compact {
+  grid-column: span 1;
+}
+
+/* Segmented Strength / Stretch selector. */
+.liftoscript-segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+}
+.liftoscript-segmented-btn {
+  height: 2.5rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.liftoscript-segmented-btn:hover {
+  color: var(--text-normal);
+}
+.liftoscript-segmented-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Modal footer actions */
+.liftoscript-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+.liftoscript-modal-actions .mod-cta,
+.liftoscript-modal-actions button {
+  min-height: 2.75rem;
+  font-size: 1.05rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Edit-line modal
+--------------------------------------------------------------------------- */
+
+.liftoscript-edit-modal .liftoscript-edit-line {
+  width: 100%;
+  min-height: 5rem;
+  font-family: var(--font-monospace);
+  font-size: 0.95rem;
+  resize: vertical;
+  padding: 0.5rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+}
+
+/* ---------------------------------------------------------------------------
+   Rendered workout cards
+--------------------------------------------------------------------------- */
+
 .liftoscript {
   margin: 0.5rem 0;
 }
@@ -53,21 +456,6 @@
   flex-shrink: 0;
 }
 
-/* P31: edit-line modal */
-
-.liftoscript-edit-modal .liftoscript-edit-line {
-  width: 100%;
-  min-height: 5rem;
-  font-family: var(--font-monospace);
-  font-size: 0.95rem;
-  resize: vertical;
-  padding: 0.5rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
-  color: var(--text-normal);
-}
-
 .liftoscript-sets {
   display: flex;
   flex-direction: column;
@@ -117,90 +505,11 @@
   cursor: pointer;
 }
 
-/* P14: touch-optimized input modal */
-
-.liftoscript-modal .liftoscript-modal-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin: 0.5rem 0 1rem;
-}
-
-.liftoscript-modal .liftoscript-touch {
-  min-height: 2.5rem;
-  font-size: 1.05rem;
-}
-
-.liftoscript-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  background: var(--background-secondary);
-}
-
-.liftoscript-stepper .liftoscript-stepper-label {
-  flex: 1;
-  color: var(--text-muted);
-}
-
-.liftoscript-stepper .liftoscript-stepper-value {
-  min-width: 3.5ch;
-  text-align: center;
-  font-size: 1.4rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.liftoscript-stepper .liftoscript-stepper-btn {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 50%;
-  font-size: 1.6rem;
-  line-height: 1;
-  cursor: pointer;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--interactive-normal);
-  color: var(--text-normal);
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-
-.liftoscript-stepper .liftoscript-stepper-btn:active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.liftoscript-stepper .liftoscript-stepper-btn-plus {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-/* Per-set weight steppers in the quick-entry / edit modal, wrapped into a
-   responsive grid so many sets still fit on mobile. */
-.liftoscript-modal .liftoscript-weight-sets {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0.5rem;
-  margin: 0.25rem 0;
-}
-
-.liftoscript-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.liftoscript-modal-actions .mod-cta,
-.liftoscript-modal-actions button {
-  min-height: 2.75rem;
-  font-size: 1.05rem;
-}
-
-/* P15: floating action button */
+/* ---------------------------------------------------------------------------
+   Floating action button
+   A single, theme-consistent circular button. The "Log" label is revealed on
+   hover (desktop) next to the icon without changing the button's geometry.
+--------------------------------------------------------------------------- */
 
 .liftoscript-fab {
   position: fixed;
@@ -211,13 +520,80 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   cursor: pointer;
   border: none;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+  overflow: visible;
+}
+
+/* Hidden hover label; expands outward on pointer devices only. */
+.liftoscript-fab .liftoscript-fab-label {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.liftoscript-fab-bottom-right .liftoscript-fab-label {
+  right: calc(100% + 0.5rem);
+}
+.liftoscript-fab-bottom-left .liftoscript-fab-label {
+  left: calc(100% + 0.5rem);
+}
+.liftoscript-fab-top-right .liftoscript-fab-label {
+  right: calc(100% + 0.5rem);
+}
+.liftoscript-fab-top-left .liftoscript-fab-label {
+  left: calc(100% + 0.5rem);
+}
+
+.liftoscript-fab .liftoscript-fab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.liftoscript-fab .liftoscript-fab-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.liftoscript-fab:hover,
+.liftoscript-fab:focus-visible {
+  background: var(--interactive-accent-hover);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.34);
+}
+
+.liftoscript-fab:active {
+  transform: scale(0.96);
+}
+
+.liftoscript-fab:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .liftoscript-fab:hover .liftoscript-fab-label {
+    opacity: 1;
+  }
 }
 
 .liftoscript-fab-bottom-right {
@@ -240,16 +616,9 @@
   top: 1rem;
 }
 
-.liftoscript-fab svg {
-  width: 1.4rem;
-  height: 1.4rem;
-}
-
-.liftoscript-fab:active {
-  transform: scale(0.94);
-}
-
-/* P30: Free Exercise DB info modal */
+/* ---------------------------------------------------------------------------
+   Free Exercise DB info modal
+--------------------------------------------------------------------------- */
 
 .liftoscript-info-modal .liftoscript-info-meta {
   margin: 0.25rem 0 0.75rem;

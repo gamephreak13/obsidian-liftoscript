@@ -45,7 +45,7 @@ export class EditLineModal extends Modal {
       );
 
     const textarea = document.createElement("textarea");
-    textarea.className = "liftoscript-edit-line liftoscript-touch";
+    textarea.className = "liftoscript-edit-line";
     textarea.value = this.opts.line;
     textarea.rows = Math.min(6, Math.max(2, (this.opts.line.match(/,/g)?.length || 0) + 2));
     textarea.spellcheck = false;
