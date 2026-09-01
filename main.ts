@@ -68,6 +68,7 @@ export default class LiftoscriptPlugin extends Plugin {
 						new Notice("Liftoscript: failed to update the exercise.");
 					});
 			},
+			editMode: () => this.settings.exerciseEditMode,
 		};
 
 		registerLiftoscriptPostProcessor(this, callbacks);

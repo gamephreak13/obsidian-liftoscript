@@ -32,6 +32,7 @@ export interface LiftoscriptSettings {
   fabPosition: "bottom-right" | "bottom-left" | "top-right" | "top-left";
   fabRestrictToFolders: boolean;
   fabFolders: string[];
+  exerciseEditMode: "guided" | "raw";
   buttonTemplates: string[];
   /** User's body weight in `defaultBodyWeightUnit`, used for bodyweight volume. */
   defaultBodyWeight: number;
@@ -70,6 +71,7 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   fabPosition: "bottom-right",
   fabRestrictToFolders: false,
   fabFolders: [],
+  exerciseEditMode: "guided",
   buttonTemplates: [
     "[ ] [ ] [ ] Squat / 5x200lb, 5x200lb, 5x200lb, rest: 120",
     "[ ] [ ] [ ] Bench Press / 5x100lb, 5x100lb, 5x100lb, rest: 90",
@@ -402,6 +404,22 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
           await plugin.saveSettings();
         })
     );
+
+    new Setting(containerEl).setName("Edit exercise modal").setDesc(
+      "How the card's edit button opens. Guided opens the quick-entry modal " +
+        "prefilled with the current exercise (preserving its checked sets and " +
+        "progress rule); Raw opens the plain liftoscript text box."
+    ).addDropdown((dd) => {
+      dd.addOption("guided", "Guided (quick-entry modal)");
+      dd.addOption("raw", "Raw text box");
+      dd.setValue(settings.exerciseEditMode);
+      dd.onChange(async (value) => {
+        const v = value as LiftoscriptSettings["exerciseEditMode"];
+        const plugin = this.plugin();
+        plugin.settings.exerciseEditMode = v;
+        await plugin.saveSettings();
+      });
+    });
 
     containerEl.createEl("h3", { text: "Meta Bind integration" });
 

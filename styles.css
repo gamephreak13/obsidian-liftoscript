@@ -178,6 +178,15 @@
   color: var(--text-on-accent);
 }
 
+/* Per-set weight steppers in the quick-entry / edit modal, wrapped into a
+   responsive grid so many sets still fit on mobile. */
+.liftoscript-modal .liftoscript-weight-sets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+}
+
 .liftoscript-modal-actions {
   display: flex;
   justify-content: flex-end;

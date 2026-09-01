@@ -6,6 +6,7 @@ import { startStretchHold, attachStretchTimer, stopStretchTimer, StretchTick } f
 import { findExercise, hasExerciseInfo } from "./exerciseDb";
 import { ExerciseInfoModal } from "./exerciseInfoModal";
 import { EditLineModal } from "./editLineModal";
+import { LogExerciseModal } from "./inputModal";
 
 /*
  * liftoscriptRender.ts
@@ -34,6 +35,10 @@ export interface RenderCallbacks {
   /** Fired when a rendered card's "Edit" button saves. Carries the old and
    *  edited raw exercise lines so the caller can rewrite the line in the note. */
   onEditLine?: (oldLine: string, newLine: string, sourcePath: string) => void;
+  /** How the card's edit button should open: guided (quick-entry modal, prefilled)
+   *  or raw (plain liftoscript text box). Defaults to "guided". Resolved live so
+   *  settings changes apply without re-registering the post-processor. */
+  editMode?: () => "guided" | "raw";
 }
 
 function renderSeconds(seconds: number): string {
@@ -102,15 +107,7 @@ function buildExerciseCard(
   editBtn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    new EditLineModal(opts.app, {
-      line: exercise.raw,
-      name: exercise.name,
-      onSave: (newLine) => {
-        if (newLine !== exercise.raw) {
-          opts.onEditLine?.(exercise.raw, newLine, opts.sourcePath);
-        }
-      },
-    }).open();
+    openEditForCard(opts, exercise);
   });
 
   const setsContainer = card.createDiv({ cls: "liftoscript-sets" });
@@ -188,6 +185,32 @@ function buildExerciseCard(
       stopBtn.setAttribute("style", "display:none");
     });
   }
+}
+
+/** Open the edit UI for a rendered card, honoring the configured edit mode.
+ *  "guided" loads the exercise into the quick-entry modal (preserving checked
+ *  sets and the progress rule); "raw" opens the plain liftoscript text box. */
+function openEditForCard(opts: CardOptions, exercise: ParsedExercise): void {
+  if (opts.editMode?.() === "raw") {
+    new EditLineModal(opts.app, {
+      line: exercise.raw,
+      name: exercise.name,
+      onSave: (newLine) => {
+        if (newLine !== exercise.raw) {
+          opts.onEditLine?.(exercise.raw, newLine, opts.sourcePath);
+        }
+      },
+    }).open();
+    return;
+  }
+  new LogExerciseModal(opts.app, {
+    editing: { raw: exercise.raw },
+    onSubmit: async (result) => {
+      if (result.line !== exercise.raw) {
+        opts.onEditLine?.(exercise.raw, result.line, opts.sourcePath);
+      }
+    },
+  }).open();
 }
 
 /**
@@ -285,6 +308,7 @@ export function renderLiftoscriptBlocks(
       buildExerciseCard(container, exercise, {
         onSetToggled: opts.onSetToggled,
         onEditLine: opts.onEditLine,
+        editMode: opts.editMode,
         sourcePath: opts.sourcePath,
         app: opts.app,
       });
@@ -310,6 +334,7 @@ export function registerLiftoscriptPostProcessor(plugin: Plugin, opts?: RenderCa
         renderLiftoscriptBlocks(container, code, {
           onSetToggled: opts?.onSetToggled,
           onEditLine: opts?.onEditLine,
+          editMode: opts?.editMode,
           sourcePath: ctx.sourcePath,
           app: plugin.app,
         });
