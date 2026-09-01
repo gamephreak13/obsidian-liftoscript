@@ -130,11 +130,74 @@ Everything lives under **Settings → Liftoscript**:
 | **Active exercise database** | Choose **Native Liftosaur** (227) or **Free Exercise DB** (876) for autocomplete + card info. |
 | **Free Exercise DB remote URL** / **Refresh remote database** | Point at a custom Free Exercise DB JSON and refresh the bundled copy. |
 | **Custom exercise database** | Path to a JSON file to override/merge the active database (applied on save). |
-| **Generate example note** | Create or refresh `Liftosaur-Example.md`, a fully worked example showing the checklist, stretch holds, bodyweight sets, Dataview metrics and quick-add buttons. |
-| **Floating action button** / **Restrict FAB to folders** / **FAB folders** | Toggle an on-canvas button that appends a quick-add exercise; optionally restrict it to specific folders. |
+| **Generate example note** | Create or refresh `Liftosaur-Example.md`, a fully worked example showing the checklist, stretch holds, bodyweight sets, Dataview metrics and quick-add buttons. || **Floating action button** / **FAB position** / **Restrict FAB to folders** / **FAB folders** | Toggle an on-canvas button that opens the quick-entry modal (Disabled / Mobile only / Desktop only / Both), choose which corner it sits in (bottom-right, bottom-left, top-right, top-left), and optionally restrict it to specific folders. |
 | **Quick-add exercise templates** | Define snippet templates behind the `Liftoscript: Add <exercise>` commands. |
 | **Frontmatter template** | Custom YAML template for the metrics written by **Update workout metrics**. |
 | **Workout filename template** | Output filename convention, e.g. `{{workout_name}}-{{date}}`. |
+
+---
+
+## Quick Entry
+
+The **quick-entry modal** (used to log a liftoscript exercise/line into the
+active note) is reachable from several places:
+
+- **Ribbon icon** — the dumbbell icon in the left sidebar always opens it.
+- **Editor menu** — a **Log exercise** item appears in the editor's right-click
+  menu (desktop) and the editor toolbar/menu (mobile).
+- **Floating action button (FAB)** — an on-canvas circular button, shown per the
+  **Floating action button** setting and pinned to the corner chosen by
+  **FAB position** (see [Settings](#settings)).
+- **Command palette** — **Liftoscript: Log exercise**.
+
+Both the editor-menu item and the FAB open the exact same modal as the ribbon
+icon and the command, so you can pick whichever entry point fits the device and
+layout you're using. On mobile, if the FAB covers editor controls, move it via
+**FAB position** or turn it off and use the editor-menu item instead.
+
+---
+
+## Meta Bind Integration
+
+The plugin registers its core commands with stable IDs, so you can invoke them
+from a [Meta Bind](https://www.metabind.org/) `meta-bind-button` block with
+`type: command`. The fully-qualified id is `obsidian-liftoscript:<command-id>`:
+
+| Button label | Command id | What it does |
+| --- | --- | --- |
+| Log Exercise | `obsidian-liftoscript:log-exercise` | Opens the quick-entry modal to append a line. |
+| Generate Next Workout | `obsidian-liftoscript:generate-next-workout` | Builds the next session from the active note. |
+| Update Metrics | `obsidian-liftoscript:update-workout-metrics` | Recomposes and writes the frontmatter metrics. |
+
+````markdown
+```meta-bind-button
+label: Log Exercise
+style: primary
+action:
+  type: command
+  command: obsidian-liftoscript:log-exercise
+```
+
+```meta-bind-button
+label: Generate Next Workout
+style: primary
+action:
+  type: command
+  command: obsidian-liftoscript:generate-next-workout
+```
+
+```meta-bind-button
+label: Update Metrics
+style: primary
+action:
+  type: command
+  command: obsidian-liftoscript:update-workout-metrics
+```
+````
+
+> These built-in command buttons complement the per-exercise **Quick-add**
+> buttons from the **Quick-add exercise templates** setting, which use ids of the
+> form `obsidian-liftoscript:liftoscript-add-<slug>` instead.
 
 ---
 

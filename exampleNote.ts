@@ -43,8 +43,14 @@ Welcome! This note shows what the **Liftoscript** plugin does. Tick a checkbox
 to persist it to the file, hit **Start rest** on a strength set for a countdown,
 watch stretch holds count down automatically, tap the ℹ️ button on a strength
 card to see its equipment, muscles, and instructions from the Free Exercise DB,
-or use the ✎ button to correct a set's reps/weight. Then run **Update workout
-metrics** and **Generate Next Workout** from the command palette.
+or use the ✎ button to correct a set's reps/weight.
+
+You can reach the quick-entry modal from anywhere: the **ribbon icon** in the
+left sidebar, the **Log exercise** item in the editor's right-click / mobile
+menu, the floating action button (FAB, configurable in Settings), or the
+**Command Palette → Liftoscript: Log exercise** command. Then run **Update
+workout metrics** and **Generate Next Workout** from the command palette, or the
+Meta Bind buttons at the bottom of this note.
 
 ## Strength
 
@@ -107,6 +113,41 @@ style: primary
 action:
   type: command
   command: ${BUTTON_COMMAND_PREFIX}:liftoscript-add-squat
+\`\`\`
+
+## Commands
+
+One-click access to the plugin's built-in commands via
+[Meta Bind](https://www.metabind.org/) buttons — no need to open the command
+palette. Each invokes the matching command by its fully qualified id
+(\`obsidian-liftoscript:<command-id>\`):
+
+- **Log exercise** — open the quick-entry modal to append a liftoscript line (\`obsidian-liftoscript:log-exercise\`).
+- **Generate Next Workout** — build the next session from this note (\`obsidian-liftoscript:generate-next-workout\`).
+- **Update workout metrics** — recompute and write the frontmatter metrics (\`obsidian-liftoscript:update-workout-metrics\`).
+
+\`\`\`meta-bind-button
+label: Log Exercise
+style: primary
+action:
+  type: command
+  command: ${BUTTON_COMMAND_PREFIX}:log-exercise
+\`\`\`
+
+\`\`\`meta-bind-button
+label: Generate Next Workout
+style: primary
+action:
+  type: command
+  command: ${BUTTON_COMMAND_PREFIX}:generate-next-workout
+\`\`\`
+
+\`\`\`meta-bind-button
+label: Update Metrics
+style: primary
+action:
+  type: command
+  command: ${BUTTON_COMMAND_PREFIX}:update-workout-metrics
 \`\`\`
 `;
 
