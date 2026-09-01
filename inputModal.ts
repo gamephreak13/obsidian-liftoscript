@@ -161,6 +161,10 @@ class SliderField {
     this.numberSpan.setAttribute("aria-label", "Edit seconds");
     const openPickerOrEdit = () => {
       if (Platform.isMobile) {
+        // Temporarily detach datalist so Done doesn't trigger the exercise dropdown
+        const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input[list]");
+        const savedList = exInput?.getAttribute("list") ?? null;
+        if (exInput) exInput.removeAttribute("list");
         showDurationPicker({
           title: "Select duration",
           initialSeconds: this.getValue(),
@@ -170,8 +174,27 @@ class SliderField {
           onConfirm: (v) => {
             this.setDisplay(v);
             this.onChange(v);
+            // Restore datalist and keep focus on the number, not the exercise bar
+            window.setTimeout(() => {
+              if (exInput && savedList) exInput.setAttribute("list", savedList);
+              if (exInput && document.activeElement === exInput) exInput.blur();
+              this.numberSpan.focus();
+            }, 60);
           },
         });
+        // If picker is cancelled, restore list as well (wheelPicker close without confirm)
+        window.setTimeout(() => {
+          const check = () => {
+            if (!document.querySelector(".liftoscript-wheel-overlay")) {
+              if (exInput && savedList && !exInput.getAttribute("list")) {
+                exInput.setAttribute("list", savedList);
+              }
+            } else {
+              window.setTimeout(check, 300);
+            }
+          };
+          window.setTimeout(check, 700);
+        }, 700);
       } else {
         this.startEditing();
       }
@@ -360,6 +383,9 @@ class WeightCard {
     this.valueEl.setAttribute("aria-label", `${opts.label}: tap to edit`);
     const openPickerOrEdit = () => {
       if (Platform.isMobile) {
+        const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input[list]");
+        const savedList = exInput?.getAttribute("list") ?? null;
+        if (exInput) exInput.removeAttribute("list");
         showWeightPicker({
           title: opts.label,
           initial: this.value,
@@ -369,8 +395,25 @@ class WeightCard {
           onConfirm: (v) => {
             this.setValue(v);
             this.onChange(v);
+            window.setTimeout(() => {
+              if (exInput && savedList) exInput.setAttribute("list", savedList);
+              if (exInput && document.activeElement === exInput) exInput.blur();
+              this.valueEl.focus();
+            }, 60);
           },
         });
+        window.setTimeout(() => {
+          const check = () => {
+            if (!document.querySelector(".liftoscript-wheel-overlay")) {
+              if (exInput && savedList && !exInput.getAttribute("list")) {
+                exInput.setAttribute("list", savedList);
+              }
+            } else {
+              window.setTimeout(check, 300);
+            }
+          };
+          window.setTimeout(check, 700);
+        }, 700);
       } else {
         this.startEditing();
       }
@@ -511,11 +554,23 @@ export class LogExerciseModal extends Modal {
     datalist.id = "liftoscript-exercise-datalist";
     const exercises = getExercises();
     const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
-    for (const e of sorted) {
-      const opt = document.createElement("option");
-      opt.value = e.name;
-      datalist.appendChild(opt);
-    }
+    // Limit dropdown: only show matching exercises after 2 chars, max 25.
+    // Prevents the full 800-item list from obscuring the modal.
+    const updateDatalist = () => {
+      const q = nameInput.value.trim().toLowerCase();
+      datalist.empty();
+      if (q.length < 2) return;
+      const filtered = sorted.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 25);
+      for (const e of filtered) {
+        const opt = document.createElement("option");
+        opt.value = e.name;
+        datalist.appendChild(opt);
+      }
+    };
+    nameInput.addEventListener("input", updateDatalist);
+    nameInput.addEventListener("focus", () => {
+      if (nameInput.value.trim().length >= 2) updateDatalist();
+    });
     nameField.control.appendChild(datalist);
 
     // Type: a segmented Strength / Stretch selector.
