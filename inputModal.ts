@@ -1,6 +1,7 @@
-import { App, ButtonComponent, Modal, Notice, setIcon } from "obsidian";
+import { App, ButtonComponent, Modal, Notice, Platform, setIcon } from "obsidian";
 import { getExercises } from "./exerciseDb";
 import { parseExerciseLine } from "./parser";
+import { showDurationPicker, showWeightPicker } from "./wheelPicker";
 
 /*
  * inputModal.ts
@@ -158,16 +159,35 @@ class SliderField {
     this.numberSpan.setAttribute("role", "button");
     this.numberSpan.setAttribute("tabindex", "0");
     this.numberSpan.setAttribute("aria-label", "Edit seconds");
-    this.numberSpan.addEventListener("click", () => this.startEditing());
+    const openPickerOrEdit = () => {
+      if (Platform.isMobile) {
+        showDurationPicker({
+          title: "Select duration",
+          initialSeconds: this.getValue(),
+          min: this.min,
+          max: this.max,
+          step: this.step,
+          onConfirm: (v) => {
+            this.setDisplay(v);
+            this.onChange(v);
+          },
+        });
+      } else {
+        this.startEditing();
+      }
+    };
+    this.numberSpan.addEventListener("click", openPickerOrEdit);
     this.numberSpan.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        this.startEditing();
+        openPickerOrEdit();
       }
     });
 
     this.numberBox.appendChild(this.numberSpan);
-    this.numberBox.addEventListener("click", () => this.startEditing());
+    this.numberBox.addEventListener("click", (e) => {
+      if (e.target === this.numberBox) openPickerOrEdit();
+    });
 
     this.slider.addEventListener("input", () => {
       const v = parseInt(this.slider.value, 10);
@@ -253,12 +273,22 @@ class SliderField {
       "aria-label",
       up ? `Increase by ${this.step}` : `Decrease by ${this.step}`
     );
-    const points = up ? "6 15 12 9 18 15" : "6 9 12 15 18 9";
-    btn.innerHTML =
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" ' +
-      'aria-hidden="true">' +
-      '<polyline points="' + points + '"></polyline></svg>';
+    // Build SVG with proper namespace so mobile WebViews render it reliably
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2.5");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("width", "18");
+    svg.setAttribute("height", "18");
+    svg.setAttribute("aria-hidden", "true");
+    const poly = document.createElementNS(svgNS, "polyline");
+    poly.setAttribute("points", up ? "6 15 12 9 18 15" : "6 9 12 15 18 9");
+    svg.appendChild(poly);
+    btn.appendChild(svg);
     btn.addEventListener("click", () => {
       const next = clamp(this.getValue() + (up ? 1 : -1) * this.step, this.min, this.max);
       this.setValue(next);
@@ -277,6 +307,152 @@ class SliderField {
   }
 }
 
+/** A per-set weight card: header "Set N" plus a horizontal [-] [value] [+] row.
+ *  The value is a large tappable span that swaps to a native number input for
+ *  exact entry, keeping the row compact and scannable. */
+class WeightCard {
+  el: HTMLDivElement;
+  private value: number;
+  private readonly step: number;
+  private readonly min: number;
+  private readonly max: number;
+  private readonly onChange: (v: number) => void;
+  private valueEl: HTMLSpanElement;
+  private editingInput: HTMLInputElement | null = null;
+
+  constructor(opts: {
+    label: string;
+    initial: number;
+    step: number;
+    min: number;
+    max: number;
+    onChange: (v: number) => void;
+  }) {
+    this.value = opts.initial;
+    this.step = opts.step;
+    this.min = opts.min;
+    this.max = opts.max;
+    this.onChange = opts.onChange;
+
+    this.el = document.createElement("div");
+    this.el.className = "liftoscript-weight-card";
+
+    const header = document.createElement("div");
+    header.className = "liftoscript-weight-card-header";
+    header.textContent = opts.label;
+    this.el.appendChild(header);
+
+    const row = document.createElement("div");
+    row.className = "liftoscript-weight-card-row";
+
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.className = "liftoscript-weight-card-btn";
+    minus.textContent = "−";
+    minus.setAttribute("aria-label", `${opts.label}: decrease`);
+    minus.addEventListener("click", () => this.stepBy(-1));
+
+    this.valueEl = document.createElement("span");
+    this.valueEl.className = "liftoscript-weight-card-value";
+    this.valueEl.textContent = String(this.value);
+    this.valueEl.setAttribute("role", "button");
+    this.valueEl.setAttribute("tabindex", "0");
+    this.valueEl.setAttribute("aria-label", `${opts.label}: tap to edit`);
+    const openPickerOrEdit = () => {
+      if (Platform.isMobile) {
+        showWeightPicker({
+          title: opts.label,
+          initial: this.value,
+          min: this.min,
+          max: this.max,
+          step: this.step,
+          onConfirm: (v) => {
+            this.setValue(v);
+            this.onChange(v);
+          },
+        });
+      } else {
+        this.startEditing();
+      }
+    };
+    this.valueEl.addEventListener("click", openPickerOrEdit);
+    this.valueEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openPickerOrEdit();
+      }
+    });
+
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "liftoscript-weight-card-btn liftoscript-weight-card-btn-plus";
+    plus.textContent = "+";
+    plus.setAttribute("aria-label", `${opts.label}: increase`);
+    plus.addEventListener("click", () => this.stepBy(1));
+
+    row.append(minus, this.valueEl, plus);
+    this.el.appendChild(row);
+  }
+
+  getValue(): number {
+    return this.value;
+  }
+
+  setValue(v: number): void {
+    this.value = clamp(v, this.min, this.max);
+    if (this.editingInput) {
+      this.editingInput.value = String(this.value);
+    } else {
+      this.valueEl.textContent = String(this.value);
+    }
+  }
+
+  private stepBy(dir: number): void {
+    this.setValue(Math.round((this.value + dir * this.step) * 100) / 100);
+    this.onChange(this.value);
+  }
+
+  private startEditing(): void {
+    if (this.editingInput) return;
+    const input = document.createElement("input");
+    input.type = "number";
+    input.className = "liftoscript-weight-card-input";
+    input.min = String(this.min);
+    input.max = String(this.max);
+    input.step = String(this.step);
+    input.value = String(this.value);
+    input.setAttribute("inputmode", "numeric");
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); this.commitEditing(); }
+      else if (e.key === "Escape") this.cancelEditing();
+    });
+    input.addEventListener("blur", () => this.commitEditing());
+    this.valueEl.replaceWith(input);
+    this.editingInput = input;
+    input.focus();
+    input.select();
+  }
+
+  private commitEditing(): void {
+    const input = this.editingInput;
+    if (!input) return;
+    const raw = parseFloat(input.value);
+    const v = Number.isNaN(raw) ? this.min : clamp(Math.round(raw * 100) / 100, this.min, this.max);
+    this.value = v;
+    input.replaceWith(this.valueEl);
+    this.editingInput = null;
+    this.valueEl.textContent = String(this.value);
+    this.onChange(this.value);
+  }
+
+  private cancelEditing(): void {
+    const input = this.editingInput;
+    if (!input) return;
+    input.replaceWith(this.valueEl);
+    this.editingInput = null;
+  }
+}
+
 /** Clamp a value into the inclusive [min, max] range. */
 function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
@@ -289,9 +465,11 @@ export class LogExerciseModal extends Modal {
   private kindStretch: HTMLButtonElement | null = null;
   private sets: Stepper | null = null;
   private reps: Stepper | null = null;
-  private weightSteppers: Stepper[] = [];
+  private weightSteppers: WeightCard[] = [];
   private weightFields: HTMLDivElement | null = null;
   private weightUnit: HTMLSelectElement | null = null;
+  private bwToggle: HTMLInputElement | null = null;
+  private isBodyweightMode = false;
   private hold: SliderField | null = null;
   private stretchRest: SliderField | null = null;
   private rest: SliderField | null = null;
@@ -396,6 +574,25 @@ export class LogExerciseModal extends Modal {
     this.weightFields = weightField.control.createDiv({ cls: "liftoscript-weight-sets" });
     this.renderWeightSteppers();
 
+    // Bodyweight toggle — when on, weight cards are added load (0 = BW, 25 = BW+25)
+    const bwRow = this.strengthFields.createDiv({ cls: "liftoscript-bw-row" });
+    const bwLabel = bwRow.createEl("label", { cls: "liftoscript-bw-label" });
+    this.bwToggle = document.createElement("input");
+    this.bwToggle.type = "checkbox";
+    this.bwToggle.className = "liftoscript-bw-checkbox";
+    bwLabel.appendChild(this.bwToggle);
+    const bwText = document.createElement("span");
+    bwText.textContent = " Bodyweight (BW)";
+    bwLabel.appendChild(bwText);
+    bwRow.createDiv({ cls: "liftoscript-field-hint", text: "When on, 0 = BW, 25 = BW+25lb" });
+    this.bwToggle.addEventListener("change", () => {
+      this.isBodyweightMode = this.bwToggle?.checked ?? false;
+      // Re-render cards so min allows negative for assisted BW
+      const keep = this.weightSteppers.map((s) => s.getValue());
+      this.renderWeightSteppers();
+      keep.forEach((v, i) => this.setWeightForSet(i, v));
+    });
+
     // Stretch fields
     this.stretchFields = contentEl.createDiv({ cls: "liftoscript-fields" });
 
@@ -464,7 +661,7 @@ export class LogExerciseModal extends Modal {
     }
   }
 
-  /** (Re)build one weight stepper per set, preserving values that already exist
+  /** (Re)build one weight card per set, preserving values that already exist
    *  so re-rendering on a sets change doesn't discard the user's input. */
   private renderWeightSteppers(): void {
     if (!this.weightFields) {
@@ -474,20 +671,18 @@ export class LogExerciseModal extends Modal {
     const previous = this.weightSteppers.map((s) => s.getValue());
     this.weightFields.empty();
     this.weightSteppers = [];
-    const compact = count > 3;
     for (let i = 0; i < count; i++) {
-      const label = count > 1 ? `${i + 1}` : "Weight";
-      const stepper = new Stepper({
+      const label = count > 1 ? `Set ${i + 1}` : "Weight";
+      const card = new WeightCard({
+        label,
         initial: previous[i] ?? 100,
         step: 5,
-        min: 0,
+        min: this.isBodyweightMode ? -200 : 0,
         max: 1000,
-        label,
-        compact,
         onChange: () => {},
       });
-      this.weightSteppers.push(stepper);
-      this.weightFields.appendChild(stepper.el);
+      this.weightSteppers.push(card);
+      this.weightFields.appendChild(card.el);
     }
   }
 
@@ -519,6 +714,9 @@ export class LogExerciseModal extends Modal {
       this.stretchRest?.setValue(first?.restSeconds ?? this.stretchRest?.getValue() ?? 15);
     } else {
       const exSets = ex.sets.length || 1;
+      const firstIsBW = !!ex.sets[0]?.isBodyweight;
+      this.isBodyweightMode = firstIsBW;
+      if (this.bwToggle) this.bwToggle.checked = firstIsBW;
       this.sets?.setValue(exSets);
       this.renderWeightSteppers();
       const first = ex.sets[0];
@@ -530,8 +728,9 @@ export class LogExerciseModal extends Modal {
           this.setWeightForSet(i, set.weight.value);
         }
       });
-      if (first && !first.isBodyweight && first.weight.unit && this.weightUnit) {
-        this.weightUnit.value = first.weight.unit;
+      if (first) {
+        const unit = first.isBodyweight ? first.addedWeight?.unit : first.weight.unit;
+        if (unit && this.weightUnit) this.weightUnit.value = unit;
       }
       if (ex.restSeconds > 0) {
         this.rest?.setValue(ex.restSeconds);
@@ -573,10 +772,15 @@ export class LogExerciseModal extends Modal {
     const unit = this.weightUnit?.value ?? "lb";
     const rest = this.rest?.getValue() ?? 90;
     const markers = this.applyMarkers(sets);
-    const tokens = Array.from(
-      { length: sets },
-      (_, i) => `${reps}x${this.weightForSet(i)}${unit}`
-    ).join(", ");
+    const tokens = Array.from({ length: sets }, (_, i) => {
+      const w = this.weightForSet(i);
+      if (this.isBodyweightMode) {
+        if (w === 0) return `${reps}xbw`;
+        if (w > 0) return `${reps}xbw+${w}${unit}`;
+        return `${reps}xbw${w}${unit}`;
+      }
+      return `${reps}x${w}${unit}`;
+    }).join(", ");
     const line =
       `${markers} ${name} / ${tokens}` +
       (rest > 0 ? `, rest: ${rest}` : "") +

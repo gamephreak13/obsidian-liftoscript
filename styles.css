@@ -336,8 +336,110 @@
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
-.liftoscript-weight-sets .liftoscript-stepper-compact {
-  grid-column: span 1;
+.liftoscript-bw-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+.liftoscript-bw-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-normal);
+  cursor: pointer;
+  user-select: none;
+}
+.liftoscript-bw-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.liftoscript-weight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.4rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+.liftoscript-weight-card-header {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: center;
+}
+.liftoscript-weight-card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.liftoscript-weight-card-value {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.15rem 0;
+}
+.liftoscript-weight-card-input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  height: 2.2rem;
+  padding: 0;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  -moz-appearance: textfield;
+}
+.liftoscript-weight-card-input::-webkit-outer-spin-button,
+.liftoscript-weight-card-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.liftoscript-weight-card-btn {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.liftoscript-weight-card-btn:active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+.liftoscript-weight-card-btn-plus {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
 
 /* Segmented Strength / Stretch selector. */
@@ -676,4 +778,156 @@
 .liftoscript-info-caption {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile wheel picker bottom sheet (Teams-style duration picker)
+--------------------------------------------------------------------------- */
+
+.liftoscript-wheel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.liftoscript-wheel-overlay.is-open {
+  opacity: 1;
+}
+.liftoscript-wheel-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 70vh;
+  background: var(--background-primary);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.liftoscript-wheel-overlay.is-open .liftoscript-wheel-sheet {
+  transform: translateY(0);
+}
+.liftoscript-wheel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.5rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.liftoscript-wheel-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.liftoscript-wheel-close {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.liftoscript-wheel-body {
+  padding: 0.75rem 1rem 0.5rem;
+  overflow: hidden;
+}
+.liftoscript-wheel-wheels {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+.liftoscript-wheel-col {
+  flex: 1;
+  max-width: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+.liftoscript-wheel-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  text-align: center;
+}
+.liftoscript-wheel-viewport {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  position: relative;
+  scrollbar-width: none;
+}
+.liftoscript-wheel-viewport::-webkit-scrollbar {
+  display: none;
+}
+/* Center highlight */
+.liftoscript-wheel-viewport::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  top: 50%;
+  height: 48px;
+  margin-top: -24px;
+  border-top: 1px solid var(--background-modifier-border-hover);
+  border-bottom: 1px solid var(--background-modifier-border-hover);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.liftoscript-wheel-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.liftoscript-wheel-item.is-selected {
+  color: var(--text-normal);
+  font-weight: 600;
+  font-size: 1.35rem;
+}
+.liftoscript-wheel-spacer {
+  flex-shrink: 0;
+}
+.liftoscript-wheel-actions {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+  justify-content: flex-end;
+}
+.liftoscript-wheel-btn {
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--interactive-normal);
+  color: var(--text-normal);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.liftoscript-wheel-btn.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
 }
