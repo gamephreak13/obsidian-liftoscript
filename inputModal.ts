@@ -161,10 +161,8 @@ class SliderField {
     this.numberSpan.setAttribute("aria-label", "Edit seconds");
     const openPickerOrEdit = () => {
       if (Platform.isMobile) {
-        // Temporarily detach datalist so Done doesn't trigger the exercise dropdown
-        const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input[list]");
-        const savedList = exInput?.getAttribute("list") ?? null;
-        if (exInput) exInput.removeAttribute("list");
+        const sugg = document.querySelector<HTMLDivElement>(".liftoscript-exercise-suggestions");
+        if (sugg) sugg.style.display = "none";
         showDurationPicker({
           title: "Select duration",
           initialSeconds: this.getValue(),
@@ -174,27 +172,14 @@ class SliderField {
           onConfirm: (v) => {
             this.setDisplay(v);
             this.onChange(v);
-            // Restore datalist and keep focus on the number, not the exercise bar
             window.setTimeout(() => {
-              if (exInput && savedList) exInput.setAttribute("list", savedList);
+              if (sugg) sugg.style.display = "none";
+              const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input");
               if (exInput && document.activeElement === exInput) exInput.blur();
               this.numberSpan.focus();
             }, 60);
           },
         });
-        // If picker is cancelled, restore list as well (wheelPicker close without confirm)
-        window.setTimeout(() => {
-          const check = () => {
-            if (!document.querySelector(".liftoscript-wheel-overlay")) {
-              if (exInput && savedList && !exInput.getAttribute("list")) {
-                exInput.setAttribute("list", savedList);
-              }
-            } else {
-              window.setTimeout(check, 300);
-            }
-          };
-          window.setTimeout(check, 700);
-        }, 700);
       } else {
         this.startEditing();
       }
@@ -383,9 +368,8 @@ class WeightCard {
     this.valueEl.setAttribute("aria-label", `${opts.label}: tap to edit`);
     const openPickerOrEdit = () => {
       if (Platform.isMobile) {
-        const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input[list]");
-        const savedList = exInput?.getAttribute("list") ?? null;
-        if (exInput) exInput.removeAttribute("list");
+        const sugg = document.querySelector<HTMLDivElement>(".liftoscript-exercise-suggestions");
+        if (sugg) sugg.style.display = "none";
         showWeightPicker({
           title: opts.label,
           initial: this.value,
@@ -396,24 +380,13 @@ class WeightCard {
             this.setValue(v);
             this.onChange(v);
             window.setTimeout(() => {
-              if (exInput && savedList) exInput.setAttribute("list", savedList);
+              if (sugg) sugg.style.display = "none";
+              const exInput = document.querySelector<HTMLInputElement>(".liftoscript-modal .liftoscript-input");
               if (exInput && document.activeElement === exInput) exInput.blur();
               this.valueEl.focus();
             }, 60);
           },
         });
-        window.setTimeout(() => {
-          const check = () => {
-            if (!document.querySelector(".liftoscript-wheel-overlay")) {
-              if (exInput && savedList && !exInput.getAttribute("list")) {
-                exInput.setAttribute("list", savedList);
-              }
-            } else {
-              window.setTimeout(check, 300);
-            }
-          };
-          window.setTimeout(check, 700);
-        }, 700);
       } else {
         this.startEditing();
       }
@@ -544,34 +517,53 @@ export class LogExerciseModal extends Modal {
     const nameInput = document.createElement("input");
     nameInput.type = "text";
     nameInput.className = "liftoscript-input";
-    nameInput.setAttribute("list", "liftoscript-exercise-datalist");
     nameInput.placeholder = "Type or pick an exercise…";
     nameInput.autocomplete = "off";
+    nameInput.setAttribute("spellcheck", "false");
+    nameField.control.addClass("liftoscript-exercise-control");
     nameField.control.appendChild(nameInput);
     this.nameInput = nameInput;
 
-    const datalist = document.createElement("datalist");
-    datalist.id = "liftoscript-exercise-datalist";
+    const suggBox = nameField.control.createDiv({ cls: "liftoscript-exercise-suggestions" });
+    suggBox.style.display = "none";
     const exercises = getExercises();
     const sorted = [...exercises].sort((a, b) => a.name.localeCompare(b.name));
-    // Limit dropdown: only show matching exercises after 2 chars, max 25.
-    // Prevents the full 800-item list from obscuring the modal.
-    const updateDatalist = () => {
+    // Scrollable custom dropdown: shows up to 30 matches, 5 visible with scroll
+    const updateSuggestions = () => {
       const q = nameInput.value.trim().toLowerCase();
-      datalist.empty();
-      if (q.length < 2) return;
-      const filtered = sorted.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 25);
-      for (const e of filtered) {
-        const opt = document.createElement("option");
-        opt.value = e.name;
-        datalist.appendChild(opt);
+      suggBox.empty();
+      if (q.length < 2) {
+        suggBox.style.display = "none";
+        return;
       }
+      const filtered = sorted.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 30);
+      if (filtered.length === 0) {
+        suggBox.style.display = "none";
+        return;
+      }
+      for (const e of filtered) {
+        const item = suggBox.createDiv({ cls: "liftoscript-exercise-suggestion", text: e.name });
+        item.addEventListener("mousedown", (ev) => {
+          ev.preventDefault();
+          nameInput.value = e.name;
+          suggBox.style.display = "none";
+          nameInput.focus();
+        });
+      }
+      suggBox.style.display = "block";
     };
-    nameInput.addEventListener("input", updateDatalist);
+    nameInput.addEventListener("input", updateSuggestions);
     nameInput.addEventListener("focus", () => {
-      if (nameInput.value.trim().length >= 2) updateDatalist();
+      if (nameInput.value.trim().length >= 2) updateSuggestions();
     });
-    nameField.control.appendChild(datalist);
+    // Hide on blur (delay to allow mousedown on suggestion)
+    nameInput.addEventListener("blur", () => {
+      window.setTimeout(() => (suggBox.style.display = "none"), 150);
+    });
+    // Hide on Escape
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") suggBox.style.display = "none";
+    });
 
     // Type: a segmented Strength / Stretch selector.
     const typeField = this.field(contentEl, "Type");

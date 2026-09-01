@@ -71,6 +71,37 @@
   letter-spacing: 0.03em;
 }
 
+.liftoscript-exercise-control {
+  position: relative;
+}
+.liftoscript-exercise-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 165px;
+  overflow-y: auto;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+  scrollbar-width: thin;
+}
+.liftoscript-exercise-suggestion {
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--background-modifier-border);
+  -webkit-tap-highlight-color: transparent;
+}
+.liftoscript-exercise-suggestion:last-child {
+  border-bottom: none;
+}
+.liftoscript-exercise-suggestion:hover {
+  background: var(--background-modifier-hover);
+}
+
 /* A +/- stepper with large touch targets. The label uses flex:1 so the control
    stretches to the grid cell it lives in, never the whole modal. */
 .liftoscript-stepper {
