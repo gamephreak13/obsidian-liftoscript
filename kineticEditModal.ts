@@ -289,7 +289,8 @@ export class KineticEditModal extends Modal {
     };
     mkType("strength", "Strength", "dumbbell");
     mkType("stretch", "Stretch", "person-standing");
-    mkType("cardio", "Cardio", "zap");
+    // TODO(cardio): implement cardio tracker (distance/time) — hidden until spec defined
+    // mkType("cardio", "Cardio", "zap");
 
     // Right col: Rest + Unit + Bodyweight
     const rightCol = topGrid.createDiv({ cls: "kinetic-col" });
@@ -332,12 +333,9 @@ export class KineticEditModal extends Modal {
     bwToggle.checked = this.isBodyweight;
     bwToggle.addEventListener("change", () => (this.isBodyweight = bwToggle.checked));
 
-    // RPE helper (desktop)
-    const rpeBox = rightCol.createDiv({ cls: "kinetic-rpe-box kinetic-desktop-only" });
-    const rpeLeft = rpeBox.createDiv({ cls: "kinetic-rpe-left" });
-    setIcon(rpeLeft.createSpan({}), "gauge");
-    rpeLeft.createSpan({ text: "Track RPE & 1RM %" });
-    rpeBox.createSpan({ text: "Active", cls: "kinetic-rpe-badge" });
+    // TODO(RPE/1RM): removed — potential future tracker (far down the line). Kept as data field `rpe` but hidden.
+    // const rpeBox = rightCol.createDiv({ cls: "kinetic-rpe-box kinetic-desktop-only" });
+    // setIcon(rpeBox.createDiv({ cls: "kinetic-rpe-left" }).createSpan({}), "gauge");
 
     // === Global params mobile card (separate for mobile) ===
     // Already covered via rightCol but CSS will reflow
@@ -368,13 +366,12 @@ export class KineticEditModal extends Modal {
     // === Sets Table ===
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
     const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
-    // Desktop: 7 cols, Mobile: 5 cols via CSS
+    // Desktop: 6 cols (#/Type/Prev/Weight/Reps/Done) — RPE removed, Remove in next commit
     tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
     tableHead.createDiv({ text: "Type", cls: "kinetic-th kinetic-th-type" });
     tableHead.createDiv({ text: "Prev Log", cls: "kinetic-th kinetic-th-prev" });
     tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
-    tableHead.createDiv({ text: "RPE", cls: "kinetic-th kinetic-th-rpe" });
     tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
 
     // Mobile head overlay (hidden on desktop)
@@ -529,17 +526,6 @@ export class KineticEditModal extends Modal {
         if (!Number.isNaN(v)) s.reps = clamp(v, 0, 50);
       });
       rInput.addEventListener("change", () => { rInput.value = String(clamp(parseInt(rInput.value, 10) || 0, 0, 50)); s.reps = parseInt(rInput.value, 10); });
-
-      // RPE
-      const rpeCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-rpe" });
-      rpeCell.setText(s.rpe.toFixed(1));
-      rpeCell.addEventListener("click", () => {
-        const v = window.prompt("RPE (6-10)", String(s.rpe));
-        if (v != null) {
-          const n = parseFloat(v);
-          if (!Number.isNaN(n)) { s.rpe = clamp(Math.round(n * 2) / 2, 6, 10); this.renderSets(); }
-        }
-      });
 
       // Done
       const doneCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-done" });
