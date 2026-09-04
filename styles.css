@@ -1644,8 +1644,8 @@
   cursor: pointer;
 }
 .kinetic-preset.is-active {
-  background: #6001d1;
-  color: #e9ddff;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 .kinetic-preset:not(.is-active):hover { background: #1f1f21; color: var(--kinetic-text); }
