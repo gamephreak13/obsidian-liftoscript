@@ -1298,7 +1298,8 @@
   /* Popout window variant — even wider, not constrained by modal viewport */
   .kinetic-popout-root .kinetic-wrapper {
     max-width: 980px;
-    max-height: none;
+    max-height: 85vh;
+    height: 85vh;
     min-height: 640px;
   }
 }
@@ -1361,7 +1362,7 @@
   text-transform: uppercase;
   color: var(--kinetic-text-muted);
 }
-.kinetic-chrome-file { color: var(--kinetic-purple-light); font-weight: 600; }
+.kinetic-chrome-file { color: var(--interactive-accent); font-weight: 600; }
 .kinetic-chrome-right { display: flex; align-items: center; gap: 12px; }
 .kinetic-kbd {
   font-family: "JetBrains Mono", monospace;
@@ -1445,8 +1446,10 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   scrollbar-width: none;
+  overscroll-behavior: contain;
 }
 .kinetic-body::-webkit-scrollbar { display: none; }
 @media (min-width: 768px) {
@@ -1488,17 +1491,30 @@
   position: relative;
   display: flex;
   align-items: center;
-  background: var(--kinetic-surface);
+  background: #242428;
   border: 1px solid var(--kinetic-border);
   border-radius: 12px;
   padding: 0 4px 0 12px;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 .kinetic-input-wrap:focus-within {
-  border-color: var(--kinetic-purple-light);
-  box-shadow: 0 0 0 1px var(--kinetic-purple-light), 0 0 12px var(--kinetic-purple-glow);
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent), 0 0 12px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
-.kinetic-input-icon { color: var(--kinetic-purple-light); display: flex; }
+.kinetic-input-icon { color: var(--interactive-accent); display: flex; }
+.kinetic-input-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  color: var(--kinetic-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 6px;
+  margin-left: 4px;
+}
+.kinetic-input-arrow:hover { background: #2a2a2c; color: var(--text-normal); }
+.kinetic-input-arrow svg { width: 16px; height: 16px; }
 .kinetic-input-icon svg { width: 18px; height: 18px; }
 .kinetic-input {
   flex: 1;
@@ -1599,8 +1615,8 @@
 }
 .kinetic-type-btn svg { width: 14px; height: 14px; }
 .kinetic-type-btn.is-active {
-  background: var(--kinetic-purple);
-  color: white;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
   font-weight: 600;
   box-shadow: 0 1px 4px rgba(0,0,0,0.3);
 }
@@ -1656,7 +1672,7 @@
   font-weight: 600;
   cursor: pointer;
 }
-.kinetic-seg-btn.is-active { background: #2a2a2c; color: #d0bcff; font-weight: 700; }
+.kinetic-seg-btn.is-active { background: var(--interactive-accent); color: var(--text-on-accent); font-weight: 700; }
 .kinetic-bw-box {
   display: flex;
   align-items: center;
@@ -1750,8 +1766,9 @@
 @media (min-width: 768px) {
   .kinetic-table-head {
     display: grid;
-    grid-template-columns: 0.6fr 1.2fr 1fr 1fr 0.9fr 0.7fr 0.6fr;
-    gap: 6px;
+    /* 5 cols after removing Type + Prev Log (was 7) — wider Weight/Reps */
+    grid-template-columns: 0.5fr 1.6fr 1.6fr 0.6fr 0.5fr;
+    gap: 8px;
     padding: 8px 16px;
     background: #2a2a2c;
     border-bottom: 1px solid var(--kinetic-border);
@@ -1770,8 +1787,9 @@
 
 .kinetic-mhead {
   display: grid;
-  grid-template-columns: 1fr 1.7fr 1fr 1fr 0.6fr;
-  gap: 4px;
+  /* 4 cols after removing Type + Prev Log — mobile keeps # Weight Reps Done */
+  grid-template-columns: 0.5fr 1.4fr 1.4fr 0.6fr;
+  gap: 6px;
   padding: 8px 12px;
   background: #202024;
   border-bottom: 1px solid var(--kinetic-border);
@@ -1791,8 +1809,9 @@
 .kinetic-table-body { display: flex; flex-direction: column; }
 .kinetic-row {
   display: grid;
-  grid-template-columns: 1fr 1.7fr 1fr 1fr 0.6fr;
-  gap: 4px;
+  /* mobile 4 cols: # Weight Reps Done (Remove hidden) */
+  grid-template-columns: 0.5fr 1.4fr 1.4fr 0.6fr;
+  gap: 6px;
   padding: 8px 12px;
   align-items: center;
   border-bottom: 1px solid rgba(46,46,52,0.4);
@@ -1802,8 +1821,9 @@
 .kinetic-row.is-done { opacity: 0.9; }
 @media (min-width: 768px) {
   .kinetic-row {
-    grid-template-columns: 0.6fr 1.2fr 1fr 1fr 0.9fr 0.7fr 0.6fr;
-    gap: 6px;
+    /* desktop 5 cols: # Weight Reps Done Remove — wider Weight/Reps */
+    grid-template-columns: 0.5fr 1.6fr 1.6fr 0.6fr 0.5fr;
+    gap: 8px;
     padding: 6px 16px;
   }
   .kinetic-row.is-alt { background: #1c1c1f; }
@@ -1870,9 +1890,9 @@
   padding: 2px;
   gap: 2px;
   width: 100%;
-  max-width: 92px;
+  max-width: 128px;
 }
-.kinetic-stepper-sm { max-width: 78px; }
+.kinetic-stepper-sm { max-width: 112px; }
 .kinetic-step-btn {
   width: 20px; height: 22px;
   border: none;
@@ -1899,17 +1919,17 @@
   outline: none;
 }
 .kinetic-remove-btn {
-  width: 20px; height: 20px;
+  width: 22px; height: 22px;
   border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--kinetic-text-muted);
-  opacity: 0.5;
+  border: 1px solid var(--kinetic-border);
+  background: #1f1f21;
+  color: #a1a1aa;
+  opacity: 0.9;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.kinetic-remove-btn:hover { opacity: 1; color: #ffb4ab; background: #1f1f21; }
+.kinetic-remove-btn:hover { opacity: 1; color: #ffb4ab; background: #2a2a2c; border-color: #3f3f46; }
 .kinetic-remove-btn.is-disabled { opacity: 0.2; cursor: not-allowed; }
 .kinetic-remove-btn svg { width: 14px; height: 14px; }
 
@@ -1974,7 +1994,7 @@
   font-size: 11px;
 }
 
-/* Footer */
+/* Footer — sticky so Save stays visible when many sets */
 .kinetic-footer {
   display: flex;
   align-items: center;
@@ -1986,6 +2006,9 @@
   border-top: 1px solid var(--kinetic-border);
   flex-shrink: 0;
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 @media (min-width: 768px) { .kinetic-footer { padding: 16px 24px; } }
 .kinetic-foot-left { display: flex; align-items: center; gap: 12px; }

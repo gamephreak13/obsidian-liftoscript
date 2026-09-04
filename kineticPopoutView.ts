@@ -220,6 +220,22 @@ export class KineticPopoutView extends ItemView {
     nameInput.addEventListener("input", updateSugg);
     nameInput.addEventListener("focus", () => { if (nameInput.value.length >= 2) updateSugg(); });
     nameInput.addEventListener("blur", () => window.setTimeout(() => (suggBox.style.display = "none"), 150));
+    const arrow = nameWrap.createDiv({ cls: "kinetic-input-arrow" });
+    setIcon(arrow, "chevron-down");
+    arrow.setAttribute("aria-label", "Show exercises");
+    arrow.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (suggBox.style.display === "none" || !suggBox.style.display) {
+        suggBox.empty();
+        const all = [...getExercises()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
+        for (const ex of all) {
+          const it = suggBox.createDiv({ cls: "kinetic-sugg-item", text: ex.name });
+          it.addEventListener("mousedown", (ev) => { ev.preventDefault(); name = ex.name; nameInput.value = ex.name; suggBox.style.display = "none"; syncMusclesFromName(); });
+        }
+        suggBox.style.display = "block";
+        nameInput.focus();
+      } else suggBox.style.display = "none";
+    });
 
     const muscleGroup = leftCol.createDiv({ cls: "kinetic-field" });
     muscleGroup.createEl("label", { text: "Target Muscles", cls: "kinetic-label" });
@@ -321,9 +337,8 @@ export class KineticPopoutView extends ItemView {
 
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
     const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
+    // 5 cols after Type+Prev removal
     tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
-    tableHead.createDiv({ text: "Type", cls: "kinetic-th kinetic-th-type" });
-    tableHead.createDiv({ text: "Prev Log", cls: "kinetic-th kinetic-th-prev" });
     tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
@@ -338,13 +353,6 @@ export class KineticPopoutView extends ItemView {
         const idxCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-idx" });
         const badge = idxCell.createSpan({ text: String(s.id), cls: "kinetic-idx-badge" });
         if (s.kind === "target") badge.addClass("is-target");
-        const typeCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-type" });
-        const typePill = typeCell.createSpan({ text: s.kind.toUpperCase(), cls: "kinetic-type-pill" });
-        typePill.addClass(`kind-${s.kind}`);
-        typePill.addEventListener("click", () => { const order: SetKind[] = ["warmup", "normal", "target", "drop"]; const cur = order.indexOf(s.kind); s.kind = order[(cur + 1) % order.length]; renderSets(); });
-        const prevCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-prev" });
-        prevCell.setText(s.prev || "—");
-        prevCell.addClass("kinetic-prev");
         const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
         const wWrap = wCell.createDiv({ cls: "kinetic-stepper" });
         const wMinus = wWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
@@ -388,7 +396,8 @@ export class KineticPopoutView extends ItemView {
     const note = body.createDiv({ cls: "kinetic-note" });
     setIcon(note.createSpan({}), "hash");
     const noteText = note.createSpan({});
-    noteText.innerHTML = `Logs automatically synced to <code>[[Workouts/2023-11.md]]</code>`;
+    const displayPath = sourcePath.replace(/^vault:\/\//, "");
+    noteText.innerHTML = `Logs automatically synced to <code>[[${displayPath}]]</code>`;
 
     const footer = wrapper.createDiv({ cls: "kinetic-footer" });
     const footLeft = footer.createDiv({ cls: "kinetic-foot-left" });

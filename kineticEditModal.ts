@@ -219,6 +219,32 @@ export class KineticEditModal extends Modal {
       if (e.key === "Enter") { e.preventDefault(); void this.handleSave(); }
       if (e.key === "Escape") suggBox.style.display = "none";
     });
+    // Arrow to bring down dropdown — lighter bg via CSS + chevron
+    const arrow = nameWrap.createDiv({ cls: "kinetic-input-arrow" });
+    setIcon(arrow, "chevron-down");
+    arrow.setAttribute("aria-label", "Show exercises");
+    arrow.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      // toggle: if hidden, show top 20 sorted; if visible, hide
+      if (suggBox.style.display === "none" || !suggBox.style.display) {
+        suggBox.empty();
+        const all = [...getExercises()].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
+        for (const ex of all) {
+          const it = suggBox.createDiv({ cls: "kinetic-sugg-item", text: ex.name });
+          it.addEventListener("mousedown", (ev) => {
+            ev.preventDefault();
+            this.name = ex.name;
+            this.nameInput.value = ex.name;
+            suggBox.style.display = "none";
+            syncMusclesFromName();
+          });
+        }
+        suggBox.style.display = "block";
+        this.nameInput.focus();
+      } else {
+        suggBox.style.display = "none";
+      }
+    });
 
     // Target muscles — wired to Exercise DB (primary + secondary)
     const muscleGroup = leftCol.createDiv({ cls: "kinetic-field" });
@@ -366,19 +392,16 @@ export class KineticEditModal extends Modal {
     // === Sets Table ===
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
     const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
-    // Desktop: 7 cols (#/Type/Prev/Weight/Reps/Done/Remove), Mobile: 5 cols via CSS
+    // Desktop: 5 cols (#/Weight/Reps/Done/Remove) — Type + Prev Log removed (potential feature)
     tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
-    tableHead.createDiv({ text: "Type", cls: "kinetic-th kinetic-th-type" });
-    tableHead.createDiv({ text: "Prev Log", cls: "kinetic-th kinetic-th-prev" });
     tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
     tableHead.createDiv({ text: "", cls: "kinetic-th kinetic-th-remove" });
 
-    // Mobile head overlay (hidden on desktop)
+    // Mobile head overlay (hidden on desktop) — 4 cols after Type+Prev removal
     const mHead = tableWrap.createDiv({ cls: "kinetic-mhead" });
-    mHead.createDiv({ text: "Set", cls: "kinetic-mhead-cell" });
-    mHead.createDiv({ text: "Previous", cls: "kinetic-mhead-cell" });
+    mHead.createDiv({ text: "#", cls: "kinetic-mhead-cell" });
     mHead.createDiv({ text: this.unit === "kg" ? "Kg" : "Lbs", cls: "kinetic-mhead-cell" });
     mHead.createDiv({ text: "Reps", cls: "kinetic-mhead-cell" });
     mHead.createDiv({ text: "✓", cls: "kinetic-mhead-cell kinetic-mhead-check" });
@@ -397,7 +420,9 @@ export class KineticEditModal extends Modal {
     const note = body.createDiv({ cls: "kinetic-note" });
     setIcon(note.createSpan({}), "hash");
     const noteText = note.createSpan({});
-    noteText.innerHTML = `Logs automatically synced to <code>[[Workouts/2023-11.md]]</code>`;
+    // reference actual file being edited
+    const displayPath = this.sourcePath.replace(/^vault:\/\//, "");
+    noteText.innerHTML = `Logs automatically synced to <code>[[${displayPath}]]</code>`;
 
     // === FOOTER ===
     const footer = wrapper.createDiv({ cls: "kinetic-footer" });
@@ -479,22 +504,7 @@ export class KineticEditModal extends Modal {
       const badge = idxCell.createSpan({ text: String(s.id), cls: "kinetic-idx-badge" });
       if (s.kind === "target") badge.addClass("is-target");
       else if (s.kind === "warmup") badge.addClass("is-warmup");
-
-      // Type
-      const typeCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-type" });
-      const typePill = typeCell.createSpan({ text: s.kind.toUpperCase(), cls: "kinetic-type-pill" });
-      typePill.addClass(`kind-${s.kind}`);
-      typePill.addEventListener("click", () => {
-        const order: SetKind[] = ["warmup", "normal", "target", "drop"];
-        const cur = order.indexOf(s.kind);
-        s.kind = order[(cur + 1) % order.length];
-        this.renderSets();
-      });
-
-      // Prev
-      const prevCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-prev" });
-      prevCell.setText(s.prev || "—");
-      prevCell.addClass("kinetic-prev");
+      // Type + Prev Log removed — kept as data (kind/prev) but hidden (potential feature)
 
       // Weight stepper
       const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
