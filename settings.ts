@@ -37,6 +37,8 @@ export interface LiftoscriptSettings {
   /** User's body weight in `defaultBodyWeightUnit`, used for bodyweight volume. */
   defaultBodyWeight: number;
   defaultBodyWeightUnit: "lb" | "kg";
+  /** When true, the active hold countdown shows a small cancel/kill switch. */
+  showHoldCancel: boolean;
 }
 
 /** The default frontmatter template (P26 default, mirrors the old hardcoded YAML). */export const DEFAULT_FRONTMATTER_TEMPLATE = [
@@ -81,6 +83,7 @@ export const DEFAULT_SETTINGS: LiftoscriptSettings = {
   ],
   defaultBodyWeight: 0,
   defaultBodyWeightUnit: "lb",
+  showHoldCancel: false,
 };
 
 /**
@@ -420,6 +423,20 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
         await plugin.saveSettings();
       });
     });
+
+    containerEl.createEl("h3", { text: "Stretch timers" });
+
+    new Setting(containerEl).setName("Hold cancel button").setDesc(
+      "When enabled, the active hold countdown shows a small kill switch " +
+        "so you can cut a hold (and its follow-on rest) short without " +
+        "unchecking the set."
+    ).addToggle((toggle) =>
+      toggle.setValue(settings.showHoldCancel).onChange(async (value) => {
+        const plugin = this.plugin();
+        plugin.settings.showHoldCancel = value;
+        await plugin.saveSettings();
+      })
+    );
 
     containerEl.createEl("h3", { text: "Meta Bind integration" });
 

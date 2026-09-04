@@ -119,3 +119,8 @@ export function stopStretchTimer(key: string): void {
     intervalId = null;
   }
 }
+
+/** Whether a session for key is currently active (used to hide cancel button for superseded timers). */
+export function hasStretchSession(key: string): boolean {
+  return sessions.has(key);
+}

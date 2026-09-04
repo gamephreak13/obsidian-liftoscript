@@ -2,7 +2,7 @@ import { MarkdownPostProcessorContext, MarkdownPostProcessor, Plugin, setIcon } 
 import { parseExerciseLine, ParsedExercise, ParsedExerciseSet, weightPrint } from "./parser";
 import { startRest, stopRest } from "./restTimer";
 import { notifyRestComplete } from "./notify";
-import { startStretchHold, attachStretchTimer, stopStretchTimer, StretchTick } from "./stretchTimer";
+import { startStretchHold, attachStretchTimer, stopStretchTimer, hasStretchSession, StretchTick } from "./stretchTimer";
 import { findExercise, hasExerciseInfo } from "./exerciseDb";
 import { ExerciseInfoModal } from "./exerciseInfoModal";
 import { EditLineModal } from "./editLineModal";
@@ -39,6 +39,8 @@ export interface RenderCallbacks {
    *  or raw (plain liftoscript text box). Defaults to "guided". Resolved live so
    *  settings changes apply without re-registering the post-processor. */
   editMode?: () => "guided" | "raw";
+  /** Whether the active hold countdown should show a small cancel/kill switch. */
+  showHoldCancel?: () => boolean;
 }
 
 function renderSeconds(seconds: number): string {
@@ -246,6 +248,21 @@ function buildStretchSets(
     const timer = row.createDiv({ cls: "liftoscript-rest-timer liftoscript-stretch-timer" });
     timer.setText(`Hold ${renderSeconds(hold)}`);
 
+    const isCancelEnabled = () => opts.showHoldCancel?.() ?? false;
+    const cancelBtn = row.createEl("button", {
+      cls: "liftoscript-stretch-cancel",
+      attr: { "aria-label": "Cancel hold" },
+    });
+    setIcon(cancelBtn, "x");
+    cancelBtn.style.display = "none";
+    cancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      stopStretchTimer(key);
+      timer.setText(`Hold ${renderSeconds(hold)}`);
+      cancelBtn.style.display = "none";
+    });
+
     const updateTimer = (tick: StretchTick) => {
       if (tick.phase === "hold") {
         timer.setText(`Hold ${renderSeconds(tick.remaining)}`);
@@ -253,6 +270,14 @@ function buildStretchSets(
         timer.setText(`Rest ${renderSeconds(tick.remaining)}`);
       } else {
         timer.setText("Done");
+      }
+      if (cancelBtn) {
+        const active = hasStretchSession(key);
+        if (isCancelEnabled() && active && (tick.phase === "hold" || tick.phase === "rest")) {
+          cancelBtn.style.display = "";
+        } else {
+          cancelBtn.style.display = "none";
+        }
       }
     };
 
@@ -283,6 +308,7 @@ function buildStretchSets(
       } else {
         stopStretchTimer(key);
         timer.setText(`Hold ${renderSeconds(hold)}`);
+        if (cancelBtn) cancelBtn.style.display = "none";
       }
     });
 
@@ -309,6 +335,7 @@ export function renderLiftoscriptBlocks(
         onSetToggled: opts.onSetToggled,
         onEditLine: opts.onEditLine,
         editMode: opts.editMode,
+        showHoldCancel: opts.showHoldCancel,
         sourcePath: opts.sourcePath,
         app: opts.app,
       });
@@ -335,6 +362,7 @@ export function registerLiftoscriptPostProcessor(plugin: Plugin, opts?: RenderCa
           onSetToggled: opts?.onSetToggled,
           onEditLine: opts?.onEditLine,
           editMode: opts?.editMode,
+          showHoldCancel: opts?.showHoldCancel,
           sourcePath: ctx.sourcePath,
           app: plugin.app,
         });

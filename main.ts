@@ -69,6 +69,7 @@ export default class LiftoscriptPlugin extends Plugin {
 					});
 			},
 			editMode: () => this.settings.exerciseEditMode,
+			showHoldCancel: () => this.settings.showHoldCancel,
 		};
 
 		registerLiftoscriptPostProcessor(this, callbacks);
