@@ -72,7 +72,15 @@ export function startStretchHold(opts: {
   onTick: (tick: StretchTick) => void;
 }): void {
   const { key, hold, rest, message, onTick } = opts;
-  sessions.delete(key);
+  // Only the last hold/rest counter should be active. Clear any existing
+  // sessions so multiple sets/exercises cannot tick and notify concurrently.
+  // Reset the display of superseded timers to their initial Hold value.
+  for (const [k, session] of Array.from(sessions.entries())) {
+    sessions.delete(k);
+    if (k !== key) {
+      session.listener?.({ phase: "hold", remaining: Math.max(0, Math.floor(session.hold)) });
+    }
+  }
   sessions.set(key, {
     key,
     hold,
