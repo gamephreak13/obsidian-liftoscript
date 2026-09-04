@@ -64,9 +64,10 @@ export async function syncLineEdit(
   if (!(file instanceof TFile)) {
     return;
   }
-  if (!oldLine || !newLine || oldLine === newLine) {
+  if (!oldLine || oldLine === newLine) {
     return;
   }
+  // Allow newLine === "" for delete flow from Kinetic modal
   await atomicModify(app, file, (data) => {
     const idx = data.indexOf(oldLine);
     if (idx === -1) {

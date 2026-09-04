@@ -18,6 +18,7 @@ import {
 	resolveFolder,
 } from "./settings";
 import { LogExerciseModal } from "./inputModal";
+import { KineticEditModal } from "./kineticEditModal";
 import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 import { atomicModify } from "./atomicWrite";
 import { ensureExampleNote } from "./exampleNote";
@@ -138,9 +139,11 @@ export default class LiftoscriptPlugin extends Plugin {
 					return false;
 				}
 				if (!checking) {
-					const modal = new LogExerciseModal(this.app, {
-						onSubmit: async (result) => {
-							await this.appendExerciseLine(file, result.line);
+					const modal = new KineticEditModal(this.app, {
+						sourcePath: file.path,
+						onSave: async (line) => {
+							if (!line.trim()) return;
+							await this.appendExerciseLine(file, line);
 						},
 					});
 					modal.open();
@@ -308,9 +311,14 @@ export default class LiftoscriptPlugin extends Plugin {
 			new Notice("Open a note to log an exercise.");
 			return;
 		}
-		const modal = new LogExerciseModal(this.app, {
-			onSubmit: async (result) => {
-				await this.appendExerciseLine(file, result.line);
+		// Kinetic — Stitch Mobile/Desktop: use KineticEditModal for new logs
+		// (Add → Save Changes) — replaces legacy LogExerciseModal.
+		const modal = new KineticEditModal(this.app, {
+			sourcePath: file.path,
+			onSave: async (line) => {
+				// Kinetic may emit empty on delete; ignore empty saves from log flow
+				if (!line.trim()) return;
+				await this.appendExerciseLine(file, line);
 			},
 		});
 		modal.open();
