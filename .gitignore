@@ -15,3 +15,7 @@ Thumbs.db
 # Local tooling (not part of the public plugin)
 .omo/
 .codegraph
+
+# Opencode & EchoesVault (local memory, not part of public plugin)
+.opencode/
+EchoesVault/
