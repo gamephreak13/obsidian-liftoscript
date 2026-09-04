@@ -216,7 +216,7 @@ export class KineticPopoutView extends ItemView {
       suggBox.style.display = "block";
     };
     nameInput.addEventListener("input", updateSugg);
-    nameInput.addEventListener("focus", () => { if (nameInput.value.length >= 2) updateSugg(); });
+    // no auto dropdown on focus
     nameInput.addEventListener("blur", () => window.setTimeout(() => (suggBox.style.display = "none"), 150));
     const arrow = nameWrap.createDiv({ cls: "kinetic-input-arrow" });
     setIcon(arrow, "chevron-down");
@@ -422,7 +422,7 @@ export class KineticPopoutView extends ItemView {
     };
     saveBtn.addEventListener("click", () => void handleSave());
     wrapper.addEventListener("keydown", (e) => { if ((e.ctrlKey || (e as any).metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void handleSave(); } if (e.key === "Escape") this.leaf.detach(); });
-    window.setTimeout(() => nameInput.focus(), 50);
+    // no auto-focus
   }
 }
 

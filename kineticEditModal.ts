@@ -211,7 +211,7 @@ export class KineticEditModal extends Modal {
       suggBox.style.display = "block";
     };
     this.nameInput.addEventListener("input", updateSugg);
-    this.nameInput.addEventListener("focus", () => { if (this.nameInput.value.length >= 2) updateSugg(); });
+    // removed auto dropdown on focus — only typing or arrow opens it
     this.nameInput.addEventListener("blur", () => window.setTimeout(() => (suggBox.style.display = "none"), 150));
     this.nameInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); void this.handleSave(); }
@@ -455,8 +455,7 @@ export class KineticEditModal extends Modal {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") { e.preventDefault(); this.addSet(); }
       if (e.key === "Escape") this.close();
     });
-    // focus first input
-    window.setTimeout(() => this.nameInput.focus(), 50);
+    // no auto-focus — keeps dropdown closed until user types or clicks arrow
   }
 
   private inferMuscles(name: string): string[] {
