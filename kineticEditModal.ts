@@ -366,13 +366,14 @@ export class KineticEditModal extends Modal {
     // === Sets Table ===
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
     const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
-    // Desktop: 6 cols (#/Type/Prev/Weight/Reps/Done) — RPE removed, Remove in next commit
+    // Desktop: 7 cols (#/Type/Prev/Weight/Reps/Done/Remove), Mobile: 5 cols via CSS
     tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
     tableHead.createDiv({ text: "Type", cls: "kinetic-th kinetic-th-type" });
     tableHead.createDiv({ text: "Prev Log", cls: "kinetic-th kinetic-th-prev" });
     tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
     tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
+    tableHead.createDiv({ text: "", cls: "kinetic-th kinetic-th-remove" });
 
     // Mobile head overlay (hidden on desktop)
     const mHead = tableWrap.createDiv({ cls: "kinetic-mhead" });
@@ -536,6 +537,25 @@ export class KineticEditModal extends Modal {
       if (!s.done) doneBtn.addClass("is-unchecked");
       doneBtn.addEventListener("click", () => {
         s.done = !s.done;
+        this.renderSets();
+      });
+
+      // Remove set (new column — viewable in Stitch)
+      const removeCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-remove" });
+      const removeBtn = removeCell.createEl("button", { cls: "kinetic-remove-btn", attr: { "aria-label": "Delete set" } });
+      setIcon(removeBtn, "trash-2");
+      // keep at least 1 set
+      if (this.sets.length <= 1) {
+        removeBtn.setAttribute("disabled", "true");
+        removeBtn.addClass("is-disabled");
+      }
+      removeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (this.sets.length <= 1) return;
+        this.sets.splice(idx, 1);
+        // renumber
+        this.sets.forEach((set, i) => (set.id = i + 1));
         this.renderSets();
       });
     });
