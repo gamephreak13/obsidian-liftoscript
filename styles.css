@@ -986,3 +986,63 @@
   color: var(--text-on-accent);
   border-color: transparent;
 }
+
+/* ---------------------------------------------------------------------------
+   Settings tab – native Obsidian patterns
+   Uses standard Setting API; no custom card wrappers. Provides dividers,
+   monospace template areas, status badges, and reset rows.
+--------------------------------------------------------------------------- */
+
+.liftoscript-settings-divider {
+  margin: 0 0 1rem;
+  border: none;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.liftoscript-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Stack textarea settings vertically to prevent horizontal squish */
+.setting-item.liftoscript-textarea-setting {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.setting-item.liftoscript-textarea-setting > .setting-item-info {
+  margin-bottom: 8px;
+}
+
+.setting-item.liftoscript-textarea-setting > .setting-item-control {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.liftoscript-template-textarea {
+  font-family: var(--font-monospace) !important;
+  width: 100% !important;
+  resize: vertical;
+}
+
+.liftoscript-reset-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.liftoscript-credits {
+  margin-top: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

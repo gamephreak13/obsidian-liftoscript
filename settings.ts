@@ -1,5 +1,5 @@
 import { App, normalizePath, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
-import { DATABASE_LABELS, DatabaseId } from "./exerciseDb";
+import { DATABASE_LABELS, DatabaseId, getExercises } from "./exerciseDb";
 import type { Unit } from "./parser";
 // Re-export the shared name extractor (defined in the pure exerciseDb module)
 // so existing importers keep using "./settings".
@@ -217,287 +217,437 @@ export class LiftoscriptSettingTab extends PluginSettingTab {
     containerEl.empty();
     const settings = this.plugin().settings;
 
-    new Setting(containerEl).setName("Workout folder").setDesc(
-      "Directory (relative to the vault) where generated workout files are saved. " +
-        "Leave empty to use the active note's folder."
-    ).addText((text) =>
-      text
-        .setPlaceholder("Fitness/Reports")
-        .setValue(settings.workoutFolder)
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.workoutFolder = value.trim();
-          await plugin.saveSettings();
-        })
-    );
+    const addSection = (title: string) => {
+      containerEl.createEl("h3", { text: title });
+      containerEl.createEl("hr", { cls: "liftoscript-settings-divider" });
+    };
 
-    new Setting(containerEl).setName("Default body weight").setDesc(
-      "Your body weight, used to compute volume for bodyweight sets (e.g. " +
-        "5xbw or 5xbw+25lb). Bodyweight volume = (body weight + added weight) x reps."
-    ).addText((text) =>
-      text
-        .setPlaceholder("0")
-        .setValue(String(settings.defaultBodyWeight))
-        .onChange(async (value) => {
-          const n = parseFloat(value);
-          const plugin = this.plugin();
-          plugin.settings.defaultBodyWeight = Number.isFinite(n) ? n : 0;
-          await plugin.saveSettings();
-        })
-    ).addDropdown((dd) => {
-      dd.addOption("lb", "lb");
-      dd.addOption("kg", "kg");
-      dd.setValue(settings.defaultBodyWeightUnit);
-      dd.onChange(async (value) => {
-        const plugin = this.plugin();
-        plugin.settings.defaultBodyWeightUnit = value as Unit;
-        await plugin.saveSettings();
+    const addStatusBadge = (setting: Setting, text: string) => {
+      const badge = setting.controlEl.createEl("span", {
+        text,
+        cls: "liftoscript-status-badge",
       });
-    });
+      badge.style.marginLeft = "0.5rem";
+      return badge;
+    };
 
-    new Setting(containerEl).setName("Append inline to current note").setDesc(
-      "When enabled, 'Generate Next Workout' appends the generated workout " +
-        "block to the active current note instead of creating a separate file."
-    ).addToggle((toggle) =>
-      toggle
-        .setValue(settings.appendToDailyNote)
-        .onChange(async (value) => {
+    // ── General & Storage ──────────────────────────────────────────────
+    addSection("General & Storage");
+
+    new Setting(containerEl)
+      .setName("Workout folder")
+      .setDesc(
+        "Directory (relative to the vault) where generated workout files are saved. " +
+          "Leave empty to use the active note's folder."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Fitness/Reports")
+          .setValue(settings.workoutFolder)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.workoutFolder = value.trim();
+            await plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Default body weight")
+      .setDesc(
+        "Your body weight, used to compute volume for bodyweight sets (e.g. " +
+          "5xbw or 5xbw+25lb). Bodyweight volume = (body weight + added weight) x reps."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("0")
+          .setValue(String(settings.defaultBodyWeight))
+          .onChange(async (value) => {
+            const n = parseFloat(value);
+            const plugin = this.plugin();
+            plugin.settings.defaultBodyWeight = Number.isFinite(n) ? n : 0;
+            await plugin.saveSettings();
+          })
+      )
+      .addDropdown((dd) => {
+        dd.addOption("lb", "lb");
+        dd.addOption("kg", "kg");
+        dd.setValue(settings.defaultBodyWeightUnit);
+        dd.onChange(async (value) => {
           const plugin = this.plugin();
-          plugin.settings.appendToDailyNote = value;
+          plugin.settings.defaultBodyWeightUnit = value as Unit;
           await plugin.saveSettings();
-        })
-    );
-
-    containerEl.createEl("h3", { text: "Exercise database" });
-
-    new Setting(containerEl).setName("Active exercise database").setDesc(
-      "Choose which dataset drives exercise autocomplete and stretch/strength " +
-        "parsing. 'Native Liftosaur' uses the built-in list. 'Free Exercise DB " +
-        "(Local)' uses the bundled open-source dataset (searchable by muscle " +
-        "group and equipment). 'Free Exercise DB (Remote)' fetches the same " +
-        "dataset live from the URL below, falling back to the bundled copy if " +
-        "the fetch fails."
-    ).addDropdown((dd) => {
-      for (const [id, label] of Object.entries(DATABASE_LABELS) as [DatabaseId, string][]) {
-        dd.addOption(id, label);
-      }
-      dd.setValue(settings.activeExerciseDb);
-      dd.onChange(async (value) => {
-        const plugin = this.plugin();
-        plugin.settings.activeExerciseDb = value as DatabaseId;
-        await plugin.saveSettings();
+        });
       });
-    });
 
-    new Setting(containerEl).setName("Free Exercise DB remote URL").setDesc(
-      "Source for the 'Free Exercise DB (Remote)' variant. Points at the " +
-        "upstream GitHub raw dist/exercises.json by default; change it to use a " +
-        "mirror or a self-hosted copy."
-    ).addText((text) =>
-      text
-        .setPlaceholder(DEFAULT_FREE_DB_URL)
-        .setValue(settings.freeExerciseRemoteUrl)
-        .onChange(async (value) => {
+    new Setting(containerEl)
+      .setName("Append inline to current note")
+      .setDesc(
+        "When enabled, 'Generate Next Workout' appends the generated workout " +
+          "block to the active current note instead of creating a separate file."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.appendToDailyNote)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.appendToDailyNote = value;
+            await plugin.saveSettings();
+          })
+      );
+
+    // Keep example note generation inside General & Storage for discoverability
+    new Setting(containerEl)
+      .setName("Generate example note")
+      .setDesc(
+        "Creates (or refreshes) a Liftosaur-Example.md that demonstrates the " +
+          "plugin. Nothing is written until you click this button, and an " +
+          "existing generated copy is updated in place."
+      )
+      .addButton((button) =>
+        button.setButtonText("Generate").setCta().onClick(() => this.onGenerateExample())
+      );
+
+    // ── Database Management ────────────────────────────────────────────
+    addSection("Database Management");
+
+    const activeDbSetting = new Setting(containerEl)
+      .setName("Active database")
+      .setDesc(
+        "Choose which dataset drives exercise autocomplete and stretch/strength " +
+          "parsing. 'Native Liftosaur' uses the built-in list. 'Free Exercise DB " +
+          "(Local)' uses the bundled open-source dataset (searchable by muscle " +
+          "group and equipment). 'Free Exercise DB (Remote)' fetches the same " +
+          "dataset live from the URL below, falling back to the bundled copy if " +
+          "the fetch fails."
+      )
+      .addDropdown((dd) => {
+        for (const [id, label] of Object.entries(DATABASE_LABELS) as [DatabaseId, string][]) {
+          dd.addOption(id, label);
+        }
+        dd.setValue(settings.activeExerciseDb);
+        dd.onChange(async (value) => {
           const plugin = this.plugin();
-          plugin.settings.freeExerciseRemoteUrl = value.trim();
+          plugin.settings.activeExerciseDb = value as DatabaseId;
           await plugin.saveSettings();
-        })
-    );
-
-    new Setting(containerEl).setName("Refresh remote database").setDesc(
-      "Re-fetch the Free Exercise DB from the URL above now."
-    ).addButton((button) =>
-      button.setButtonText("Refresh").setCta().onClick(() => this.onRefreshRemote())
-    );
-
-
-    new Setting(containerEl).setName("Custom exercise database").setDesc(
-      "Path (relative to the vault) to a JSON file that overrides or appends to " +
-        "the default Liftosaur exercise list. Accepts an array of exercises or " +
-        "{ \"exercises\": [...] }. Changing this requires a plugin reload."
-    ).addText((text) =>
-      text
-        .setPlaceholder("Fitness/exercises.json")
-        .setValue(settings.customExerciseDb)
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.customExerciseDb = value.trim();
-          await plugin.saveSettings();
-        })
-    );
-
-    new Setting(containerEl).setName("Apply custom database").setDesc(
-      "Load and merge the configured custom exercise database now."
-    ).addButton((button) =>
-      button.setButtonText("Apply").setCta().onClick(() => this.onApplyCustom())
-    );
-
-    containerEl.createEl("h3", { text: "Example note" });
-
-    new Setting(containerEl).setName("Generate example note").setDesc(
-      "Creates (or refreshes) a Liftosaur-Example.md that demonstrates the " +
-        "plugin. Nothing is written until you click this button, and an " +
-        "existing generated copy is updated in place."
-    ).addButton((button) =>
-      button.setButtonText("Generate").setCta().onClick(() => this.onGenerateExample())
-    );
-
-    containerEl.createEl("h3", { text: "Quick entry" });
-
-    new Setting(containerEl).setName("Floating action button").setDesc(
-      "A quick-entry FAB that opens the Log exercise modal. Choose which " +
-        "platforms should show it, or Disabled to keep it off."
-    ).addDropdown((dd) => {
-      dd.addOption("disabled", "Disabled");
-      dd.addOption("mobile", "Mobile Only");
-      dd.addOption("desktop", "Desktop Only");
-      dd.addOption("both", "Both");
-      dd.setValue(settings.fabMode);
-      dd.onChange(async (value) => {
-        const v = value as LiftoscriptSettings["fabMode"];
-        const plugin = this.plugin();
-        plugin.settings.fabMode = v;
-        await plugin.saveSettings();
+          // Re-render to update status badge count
+          this.display();
+        });
       });
-    });
+    // Status badge: inline indicator next to database selector
+    try {
+      const count = getExercises().length;
+      addStatusBadge(activeDbSetting, `Loaded ${count} exercises`);
+    } catch {
+      // exerciseDb may be unavailable in tests
+    }
 
-    new Setting(containerEl).setName("FAB position").setDesc(
-      "Where the floating action button is placed. Move it away from editor " +
-        "controls it may cover."
-    ).addDropdown((dd) => {
-      dd.addOption("bottom-right", "Bottom Right");
-      dd.addOption("bottom-left", "Bottom Left");
-      dd.addOption("top-right", "Top Right");
-      dd.addOption("top-left", "Top Left");
-      dd.setValue(settings.fabPosition);
-      dd.onChange(async (value) => {
-        const v = value as LiftoscriptSettings["fabPosition"];
-        const plugin = this.plugin();
-        plugin.settings.fabPosition = v;
-        await plugin.saveSettings();
+    // Combined Input-Action Row: Remote URL + Refresh button on same line
+    new Setting(containerEl)
+      .setName("Remote URL")
+      .setDesc(
+        "Source for the 'Free Exercise DB (Remote)' variant. Points at the " +
+          "upstream GitHub raw dist/exercises.json by default; change it to use a " +
+          "mirror or a self-hosted copy."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder(DEFAULT_FREE_DB_URL)
+          .setValue(settings.freeExerciseRemoteUrl)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.freeExerciseRemoteUrl = value.trim();
+            await plugin.saveSettings();
+          })
+      )
+      .addButton((button) =>
+        button.setButtonText("Refresh").setCta().onClick(() => this.onRefreshRemote())
+      );
+
+    // Combined Input-Action Row: Custom JSON override path + Apply button on same line
+    new Setting(containerEl)
+      .setName("Custom JSON override path")
+      .setDesc(
+        "Path (relative to the vault) to a JSON file that overrides or appends to " +
+          "the default Liftosaur exercise list. Accepts an array of exercises or " +
+          "{ \"exercises\": [...] }. Changing this requires Apply."
+      )
+      .addText((text) =>
+        text
+          .setPlaceholder("Fitness/exercises.json")
+          .setValue(settings.customExerciseDb)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.customExerciseDb = value.trim();
+            await plugin.saveSettings();
+          })
+      )
+      .addButton((button) =>
+        button.setButtonText("Apply").setCta().onClick(() => this.onApplyCustom())
+      );
+
+    // ── Quick Entry & Mobile ───────────────────────────────────────────
+    addSection("Quick Entry & Mobile");
+
+    new Setting(containerEl)
+      .setName("Floating action button (FAB)")
+      .setDesc(
+        "A quick-entry FAB that opens the Log exercise modal. Choose which " +
+          "platforms should show it, or Disabled to keep it off."
+      )
+      .addDropdown((dd) => {
+        dd.addOption("disabled", "Disabled");
+        dd.addOption("mobile", "Mobile Only");
+        dd.addOption("desktop", "Desktop Only");
+        dd.addOption("both", "Both");
+        dd.setValue(settings.fabMode);
+        dd.onChange(async (value) => {
+          const v = value as LiftoscriptSettings["fabMode"];
+          const plugin = this.plugin();
+          plugin.settings.fabMode = v;
+          await plugin.saveSettings();
+        });
       });
-    });
 
-    new Setting(containerEl).setName("Restrict FAB to folders").setDesc(
-      "When enabled, the FAB only appears while a note inside one of the " +
-        "listed folders is active."
-    ).addToggle((toggle) =>
-      toggle
-        .setValue(settings.fabRestrictToFolders)
-        .onChange(async (value) => {
+    new Setting(containerEl)
+      .setName("FAB position")
+      .setDesc(
+        "Where the floating action button is placed. Move it away from editor " +
+          "controls it may cover."
+      )
+      .addDropdown((dd) => {
+        dd.addOption("bottom-right", "Bottom Right");
+        dd.addOption("bottom-left", "Bottom Left");
+        dd.addOption("top-right", "Top Right");
+        dd.addOption("top-left", "Top Left");
+        dd.setValue(settings.fabPosition);
+        dd.onChange(async (value) => {
+          const v = value as LiftoscriptSettings["fabPosition"];
           const plugin = this.plugin();
-          plugin.settings.fabRestrictToFolders = value;
+          plugin.settings.fabPosition = v;
           await plugin.saveSettings();
-        })
-    );
-
-    new Setting(containerEl).setName("FAB folders").setDesc(
-      "One folder path per line (vault-relative). Leave empty to allow the FAB " +
-        "in every folder. Nested folders are included."
-    ).addTextArea((area) =>
-      area
-        .setPlaceholder("Fitness\nWorkouts")
-        .setValue(settings.fabFolders.join("\n"))
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.fabFolders = value
-            .split("\n")
-            .map((p) => p.trim())
-            .filter(Boolean);
-          await plugin.saveSettings();
-        })
-    );
-
-    new Setting(containerEl).setName("Edit exercise modal").setDesc(
-      "How the card's edit button opens. Guided opens the quick-entry modal " +
-        "prefilled with the current exercise (preserving its checked sets and " +
-        "progress rule); Raw opens the plain liftoscript text box."
-    ).addDropdown((dd) => {
-      dd.addOption("guided", "Guided (quick-entry modal)");
-      dd.addOption("raw", "Raw text box");
-      dd.setValue(settings.exerciseEditMode);
-      dd.onChange(async (value) => {
-        const v = value as LiftoscriptSettings["exerciseEditMode"];
-        const plugin = this.plugin();
-        plugin.settings.exerciseEditMode = v;
-        await plugin.saveSettings();
+        });
       });
-    });
 
-    containerEl.createEl("h3", { text: "Stretch timers" });
+    new Setting(containerEl)
+      .setName("Restrict FAB to folders")
+      .setDesc(
+        "When enabled, the FAB only appears while a note inside one of the " +
+          "listed folders is active."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(settings.fabRestrictToFolders)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.fabRestrictToFolders = value;
+            await plugin.saveSettings();
+          })
+      );
 
-    new Setting(containerEl).setName("Hold cancel button").setDesc(
-      "When enabled, the active hold countdown shows a small kill switch " +
-        "so you can cut a hold (and its follow-on rest) short without " +
-        "unchecking the set."
-    ).addToggle((toggle) =>
-      toggle.setValue(settings.showHoldCancel).onChange(async (value) => {
+    new Setting(containerEl)
+      .setName("FAB folders")
+      .setDesc(
+        "One folder path per line (vault-relative). Leave empty to allow the FAB " +
+          "in every folder. Nested folders are included."
+      )
+      .addTextArea((area) => {
+        area
+          .setPlaceholder("Fitness\nWorkouts")
+          .setValue(settings.fabFolders.join("\n"))
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.fabFolders = value
+              .split("\n")
+              .map((p) => p.trim())
+              .filter(Boolean);
+            await plugin.saveSettings();
+          });
+        area.inputEl.style.fontFamily = "var(--font-monospace)";
+        area.inputEl.rows = 4;
+      });
+
+    new Setting(containerEl)
+      .setName("Edit exercise modal")
+      .setDesc(
+        "How the card's edit button opens. Guided opens the quick-entry modal " +
+          "prefilled with the current exercise (preserving its checked sets and " +
+          "progress rule); Raw opens the plain liftoscript text box."
+      )
+      .addDropdown((dd) => {
+        dd.addOption("guided", "Guided (quick-entry modal)");
+        dd.addOption("raw", "Raw text box");
+        dd.setValue(settings.exerciseEditMode);
+        dd.onChange(async (value) => {
+          const v = value as LiftoscriptSettings["exerciseEditMode"];
+          const plugin = this.plugin();
+          plugin.settings.exerciseEditMode = v;
+          await plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Hold cancel button")
+      .setDesc(
+        "When enabled, the active hold countdown shows a small kill switch " +
+          "so you can cut a hold (and its follow-on rest) short without " +
+          "unchecking the set."
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(settings.showHoldCancel).onChange(async (value) => {
+          const plugin = this.plugin();
+          plugin.settings.showHoldCancel = value;
+          await plugin.saveSettings();
+        })
+      );
+
+    // ── Templates & Automation ─────────────────────────────────────────
+    addSection("Templates & Automation");
+
+    // — Frontmatter: stacked vertical layout to prevent horizontal squish
+    {
+      const s = new Setting(containerEl)
+        .setName("Frontmatter template")
+        .setDesc(
+          "Custom YAML frontmatter used by 'Update workout metrics in frontmatter' " +
+            "and 'Generate Next Workout'. One key: value per line. Supported " +
+            "variables: {{date}}, {{total_volume}}, {{total_volume_unit}}, " +
+            "{{completed_sets}}, {{total_sets}}, {{total_reps}}, " +
+            "{{exercises_completed}}, {{session_duration}}, " +
+            "{{session_duration_seconds}}, {{last_updated}}, {{previous_workout}}, " +
+            "{{workout_name}}. Leave empty for the default."
+        );
+      s.settingEl.addClass("liftoscript-textarea-setting");
+      s.settingEl.style.flexDirection = "column";
+      s.settingEl.style.alignItems = "stretch";
+      s.controlEl.style.flexDirection = "column";
+      s.controlEl.style.alignItems = "stretch";
+      s.controlEl.style.width = "100%";
+      s.addTextArea((area) => {
+        area
+          .setPlaceholder(DEFAULT_FRONTMATTER_TEMPLATE)
+          .setValue(settings.frontmatterTemplate || DEFAULT_FRONTMATTER_TEMPLATE)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.frontmatterTemplate = value;
+            await plugin.saveSettings();
+          });
+        area.inputEl.style.width = "100%";
+        area.inputEl.style.resize = "vertical";
+        area.inputEl.style.fontFamily = "var(--font-monospace)";
+        area.inputEl.style.minHeight = "120px";
+        area.inputEl.rows = 6;
+        area.inputEl.addClass("liftoscript-template-textarea");
+      });
+      const bar = s.controlEl.createDiv({ cls: "liftoscript-reset-bar" });
+      bar.style.display = "flex";
+      bar.style.justifyContent = "flex-end";
+      bar.style.marginTop = "8px";
+      bar.style.width = "100%";
+      const btn = bar.createEl("button", { text: "Reset to default" });
+      btn.addEventListener("click", async () => {
         const plugin = this.plugin();
-        plugin.settings.showHoldCancel = value;
+        plugin.settings.frontmatterTemplate = DEFAULT_FRONTMATTER_TEMPLATE;
         await plugin.saveSettings();
-      })
-    );
+        this.display();
+      });
+    }
 
-    containerEl.createEl("h3", { text: "Meta Bind integration" });
+    // — Filename: same stacked pattern, rows=2 / minHeight 40px
+    {
+      const s = new Setting(containerEl)
+        .setName("Workout filename template")
+        .setDesc(
+          "Default file name for generated workout reports. Supported variables: " +
+            "{{date}} (YYYY-MM-DD), {{time}} (HH-MM), {{workout_name}}. The .md " +
+            "extension is appended automatically. Leave empty for the default " +
+            "'{{workout_name}}-{{date}}'."
+        );
+      s.settingEl.addClass("liftoscript-textarea-setting");
+      s.settingEl.style.flexDirection = "column";
+      s.settingEl.style.alignItems = "stretch";
+      s.controlEl.style.flexDirection = "column";
+      s.controlEl.style.alignItems = "stretch";
+      s.controlEl.style.width = "100%";
+      s.addTextArea((area) => {
+        area
+          .setPlaceholder(DEFAULT_FILENAME_TEMPLATE)
+          .setValue(settings.workoutFilenameTemplate || DEFAULT_FILENAME_TEMPLATE)
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.workoutFilenameTemplate = value;
+            await plugin.saveSettings();
+          });
+        area.inputEl.style.width = "100%";
+        area.inputEl.style.resize = "vertical";
+        area.inputEl.style.fontFamily = "var(--font-monospace)";
+        area.inputEl.style.minHeight = "40px";
+        area.inputEl.rows = 2;
+        area.inputEl.addClass("liftoscript-template-textarea");
+      });
+      const bar = s.controlEl.createDiv({ cls: "liftoscript-reset-bar" });
+      bar.style.display = "flex";
+      bar.style.justifyContent = "flex-end";
+      bar.style.marginTop = "8px";
+      bar.style.width = "100%";
+      const btn = bar.createEl("button", { text: "Reset to default" });
+      btn.addEventListener("click", async () => {
+        const plugin = this.plugin();
+        plugin.settings.workoutFilenameTemplate = DEFAULT_FILENAME_TEMPLATE;
+        await plugin.saveSettings();
+        this.display();
+      });
+    }
 
-    new Setting(containerEl).setName("Quick-add exercise templates").setDesc(
-      "One liftoscript line per template. Each becomes a command named " +
-        "\"Liftoscript: Add <exercise>\" (id obsidian-liftoscript:liftoscript-add-<slug>), " +
-        "which a ```meta-bind-button block invokes via \"type: command\" with that full id. " +
-        "Changes apply after a plugin reload."
-    ).addTextArea((area) =>
-      area
-        .setPlaceholder("[ ] [ ] [ ] Squat / 5x200lb, rest: 120")
-        .setValue(settings.buttonTemplates.join("\n"))
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.buttonTemplates = value
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean);
-          await plugin.saveSettings();
-        })
-    );
+    // — Meta Bind quick-add: stacked, rows=6 / minHeight 120px
+    {
+      const s = new Setting(containerEl)
+        .setName("Quick-add exercise templates (Meta Bind)")
+        .setDesc(
+          "One liftoscript line per template. Each becomes a command named " +
+            "\"Liftoscript: Add <exercise>\" (id obsidian-liftoscript:liftoscript-add-<slug>), " +
+            "which a ```meta-bind-button block invokes via \"type: command\" with that full id. " +
+            "Changes apply after a plugin reload."
+        );
+      s.settingEl.addClass("liftoscript-textarea-setting");
+      s.settingEl.style.flexDirection = "column";
+      s.settingEl.style.alignItems = "stretch";
+      s.controlEl.style.flexDirection = "column";
+      s.controlEl.style.alignItems = "stretch";
+      s.controlEl.style.width = "100%";
+      s.addTextArea((area) => {
+        area
+          .setPlaceholder("[ ] [ ] [ ] Squat / 5x200lb, rest: 120")
+          .setValue(settings.buttonTemplates.join("\n"))
+          .onChange(async (value) => {
+            const plugin = this.plugin();
+            plugin.settings.buttonTemplates = value
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean);
+            await plugin.saveSettings();
+          });
+        area.inputEl.style.width = "100%";
+        area.inputEl.style.resize = "vertical";
+        area.inputEl.style.fontFamily = "var(--font-monospace)";
+        area.inputEl.style.minHeight = "120px";
+        area.inputEl.rows = 6;
+        area.inputEl.addClass("liftoscript-template-textarea");
+      });
+      const bar = s.controlEl.createDiv({ cls: "liftoscript-reset-bar" });
+      bar.style.display = "flex";
+      bar.style.justifyContent = "flex-end";
+      bar.style.marginTop = "8px";
+      bar.style.width = "100%";
+      const btn = bar.createEl("button", { text: "Reset to default" });
+      btn.addEventListener("click", async () => {
+        const plugin = this.plugin();
+        plugin.settings.buttonTemplates = [...DEFAULT_SETTINGS.buttonTemplates];
+        await plugin.saveSettings();
+        this.display();
+      });
+    }
 
-    containerEl.createEl("h3", { text: "Templates" });
-
-    new Setting(containerEl).setName("Frontmatter template").setDesc(
-      "Custom YAML frontmatter used by 'Update workout metrics in frontmatter' " +
-        "and 'Generate Next Workout'. One key: value per line. Supported " +
-        "variables: {{date}}, {{total_volume}}, {{total_volume_unit}}, " +
-        "{{completed_sets}}, {{total_sets}}, {{total_reps}}, " +
-        "{{exercises_completed}}, {{session_duration}}, " +
-        "{{session_duration_seconds}}, {{last_updated}}, {{previous_workout}}, " +
-        "{{workout_name}}. Leave empty for the default."
-    ).addTextArea((area) =>
-      area
-        .setPlaceholder(DEFAULT_FRONTMATTER_TEMPLATE)
-        .setValue(settings.frontmatterTemplate || DEFAULT_FRONTMATTER_TEMPLATE)
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.frontmatterTemplate = value;
-          await plugin.saveSettings();
-        })
-    );
-
-    new Setting(containerEl).setName("Workout filename template").setDesc(
-      "Default file name for generated workout reports. Supported variables: " +
-        "{{date}} (YYYY-MM-DD), {{time}} (HH-MM), {{workout_name}}. The .md " +
-        "extension is appended automatically. Leave empty for the default " +
-        "'{{workout_name}}-{{date}}'."
-    ).addText((text) =>
-      text
-        .setPlaceholder(DEFAULT_FILENAME_TEMPLATE)
-        .setValue(settings.workoutFilenameTemplate || DEFAULT_FILENAME_TEMPLATE)
-        .onChange(async (value) => {
-          const plugin = this.plugin();
-          plugin.settings.workoutFilenameTemplate = value;
-          await plugin.saveSettings();
-        })
-    );
-
-    containerEl.createEl("h3", { text: "Credits" });
-
+    // Credits – informational footer (not a settings category)
     const credits = containerEl.createEl("p", {
       cls: "liftoscript-credits",
     });
