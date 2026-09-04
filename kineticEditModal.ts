@@ -1,5 +1,5 @@
-import { App, Modal, Notice, setIcon } from "obsidian";
-import { getExercises } from "./exerciseDb";
+import { App, Modal, Notice, Platform, setIcon } from "obsidian";
+import { findExercise, getExercises } from "./exerciseDb";
 import { parseExerciseLine } from "./parser";
 
 /**
@@ -138,7 +138,7 @@ export class KineticEditModal extends Modal {
     handleBar.createDiv({ cls: "kinetic-drag-handle" });
     const crumb = handleBar.createDiv({ cls: "kinetic-crumb" });
     setIcon(crumb.createSpan({}), "diamond");
-    crumb.createSpan({ text: "Obsidian Workout Logger • exercise.md" });
+    crumb.createSpan({ text: "Obsidian Workout Logger • liftoscript" });
 
     // === DESKTOP WINDOW CHROME ===
     const chrome = wrapper.createDiv({ cls: "kinetic-chrome" });
@@ -147,7 +147,7 @@ export class KineticEditModal extends Modal {
     const crumbDesktop = chromeLeft.createDiv({ cls: "kinetic-chrome-crumb" });
     crumbDesktop.createSpan({ text: "Obsidian Workout Logger" });
     crumbDesktop.createSpan({ text: "/" });
-    const crumbFile = crumbDesktop.createSpan({ text: "exercise.md" });
+    const crumbFile = crumbDesktop.createSpan({ text: "liftoscript" });
     crumbFile.addClass("kinetic-chrome-file");
     const chromeRight = chrome.createDiv({ cls: "kinetic-chrome-right" });
     const escBadge = chromeRight.createSpan({ text: "ESC", cls: "kinetic-kbd" });
@@ -220,34 +220,55 @@ export class KineticEditModal extends Modal {
       if (e.key === "Escape") suggBox.style.display = "none";
     });
 
-    // Target muscles — static chips from design
+    // Target muscles — wired to Exercise DB (primary + secondary)
     const muscleGroup = leftCol.createDiv({ cls: "kinetic-field" });
     muscleGroup.createEl("label", { text: "Target Muscles", cls: "kinetic-label" });
     const muscleRow = muscleGroup.createDiv({ cls: "kinetic-chips" });
-    const chips = this.inferMuscles(this.name);
-    for (const chip of chips) {
-      const c = muscleRow.createSpan({ cls: "kinetic-chip" });
-      c.setText(`#${chip}`);
-      const x = c.createEl("button", { text: "×", cls: "kinetic-chip-x" });
-      x.addEventListener("click", () => c.remove());
-    }
+    let muscleChips: string[] = this.resolveMuscles(this.name);
+    const renderMuscleChips = () => {
+      // keep Add-tag button, clear others
+      const addBtn = muscleRow.querySelector(".kinetic-chip-add") as HTMLElement | null;
+      muscleRow.querySelectorAll(".kinetic-chip").forEach((el) => el.remove());
+      for (const chip of muscleChips) {
+        const c = document.createElement("span");
+        c.className = "kinetic-chip";
+        c.textContent = `#${chip}`;
+        const x = document.createElement("button");
+        x.className = "kinetic-chip-x";
+        x.textContent = "×";
+        x.addEventListener("click", () => {
+          muscleChips = muscleChips.filter((m) => m !== chip);
+          c.remove();
+        });
+        c.appendChild(x);
+        if (addBtn) muscleRow.insertBefore(c, addBtn);
+        else muscleRow.appendChild(c);
+      }
+    };
     const addChip = muscleRow.createEl("button", { cls: "kinetic-chip-add" });
     setIcon(addChip.createSpan({}), "plus");
     addChip.createSpan({ text: " Add tag" });
     addChip.addEventListener("click", () => {
       const name = window.prompt("Muscle tag (e.g. chest)");
       if (name) {
-        const c = document.createElement("span");
-        c.className = "kinetic-chip";
-        c.textContent = `#${name.replace(/^#/, "")}`;
-        const x = document.createElement("button");
-        x.className = "kinetic-chip-x";
-        x.textContent = "×";
-        x.addEventListener("click", () => c.remove());
-        c.appendChild(x);
-        muscleRow.insertBefore(c, addChip);
+        const clean = name.replace(/^#/, "").trim().toLowerCase();
+        if (clean && !muscleChips.includes(clean)) {
+          muscleChips.push(clean);
+          renderMuscleChips();
+        }
       }
     });
+    renderMuscleChips();
+    // keep chips in sync when name changes (suggestion or typing)
+    const syncMusclesFromName = () => {
+      const db = this.resolveMuscles(this.name);
+      muscleChips = db;
+      renderMuscleChips();
+    };
+    // wire: typing + suggestion selection refreshes muscles
+    this.nameInput.addEventListener("input", syncMusclesFromName);
+    // suggestion mousedown sets value without firing input, so sync on next tick
+    suggBox.addEventListener("mousedown", () => window.setTimeout(syncMusclesFromName, 0));
 
     // Exercise Type
     const typeGroup = leftCol.createDiv({ cls: "kinetic-field" });
@@ -423,6 +444,17 @@ export class KineticEditModal extends Modal {
     if (lower.includes("squat")) return ["quads", "glutes"];
     if (lower.includes("deadlift")) return ["hamstrings", "back"];
     return ["chest", "triceps"];
+  }
+
+  private resolveMuscles(name: string): string[] {
+    const ex = findExercise(name);
+    if (ex && (ex.primaryMuscles?.length || ex.secondaryMuscles?.length)) {
+      const combined = [...(ex.primaryMuscles ?? []), ...(ex.secondaryMuscles ?? [])];
+      // normalize to lowercase-kebab, dedupe, limit 4 for chip row
+      const norm = combined.map((m) => m.trim().toLowerCase().replace(/\s+/g, "-")).filter(Boolean);
+      return [...new Set(norm)].slice(0, 4);
+    }
+    return this.inferMuscles(name);
   }
 
   private setKind(k: ExerciseKind): void {
