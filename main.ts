@@ -19,6 +19,7 @@ import {
 } from "./settings";
 import { LogExerciseModal } from "./inputModal";
 import { KineticEditModal } from "./kineticEditModal";
+import { KINETIC_VIEW_TYPE, KineticPopoutView, openKineticEdit } from "./kineticPopoutView";
 import { insertLineIntoLastBlock, stripFrontmatter } from "./appendLine";
 import { atomicModify } from "./atomicWrite";
 import { ensureExampleNote } from "./exampleNote";
@@ -31,6 +32,7 @@ export default class LiftoscriptPlugin extends Plugin {
 	private fetchedRemoteUrl = "";
 
 	async onload() {
+		this.registerView(KINETIC_VIEW_TYPE, (leaf) => new KineticPopoutView(leaf));
 		await this.loadSettings();
 		// P20: the example note is generated on demand from the settings tab,
 		// never automatically, so no file appears without the user's action.
@@ -139,14 +141,13 @@ export default class LiftoscriptPlugin extends Plugin {
 					return false;
 				}
 				if (!checking) {
-					const modal = new KineticEditModal(this.app, {
+					openKineticEdit(this.app, {
 						sourcePath: file.path,
 						onSave: async (line) => {
 							if (!line.trim()) return;
 							await this.appendExerciseLine(file, line);
 						},
 					});
-					modal.open();
 				}
 				return true;
 			},
@@ -311,17 +312,15 @@ export default class LiftoscriptPlugin extends Plugin {
 			new Notice("Open a note to log an exercise.");
 			return;
 		}
-		// Kinetic — Stitch Mobile/Desktop: use KineticEditModal for new logs
-		// (Add → Save Changes) — replaces legacy LogExerciseModal.
-		const modal = new KineticEditModal(this.app, {
+		// Kinetic — Desktop: popout window (wider, 1024×780) for sizing;
+		// Mobile: stays modal. Both via openKineticEdit helper.
+		openKineticEdit(this.app, {
 			sourcePath: file.path,
 			onSave: async (line) => {
-				// Kinetic may emit empty on delete; ignore empty saves from log flow
 				if (!line.trim()) return;
 				await this.appendExerciseLine(file, line);
 			},
 		});
-		modal.open();
 	}
 
 	/**

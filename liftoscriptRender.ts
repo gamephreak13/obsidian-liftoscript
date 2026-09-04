@@ -6,8 +6,7 @@ import { startStretchHold, attachStretchTimer, stopStretchTimer, hasStretchSessi
 import { findExercise, hasExerciseInfo } from "./exerciseDb";
 import { ExerciseInfoModal } from "./exerciseInfoModal";
 import { EditLineModal } from "./editLineModal";
-import { LogExerciseModal } from "./inputModal";
-import { KineticEditModal } from "./kineticEditModal";
+import { openKineticEdit } from "./kineticPopoutView";
 
 /*
  * liftoscriptRender.ts
@@ -191,8 +190,8 @@ function buildExerciseCard(
 }
 
 /** Open the edit UI for a rendered card, honoring the configured edit mode.
- *  "guided" loads the Kinetic modal (Stitch: Mobile bottom-sheet / Desktop centered,
- *  5-sets, RPE, Type, Presets, Bodyweight) preserving markers + progress;
+ *  "guided" loads the Kinetic UI — Mobile: modal bottom-sheet; Desktop:
+ *  popout window (1024×780, wider, Stitch canvas) via openKineticEdit.
  *  "raw" opens the plain liftoscript text box. */
 function openEditForCard(opts: CardOptions, exercise: ParsedExercise): void {
   if (opts.editMode?.() === "raw") {
@@ -208,9 +207,8 @@ function openEditForCard(opts: CardOptions, exercise: ParsedExercise): void {
     return;
   }
   // Kinetic — Obsidian Kinetic (Stitch 4300289602386256319)
-  // Desktop: 2-col params + 7-col table (#/Type/Prev/Weight/Reps/RPE/Done)
-  // Mobile: handle + stacked identity + 5-col table (Set/Prev/Lbs/Reps/✓)
-  new KineticEditModal(opts.app, {
+  // Mobile modal vs Desktop popout (wider) handled inside helper
+  openKineticEdit(opts.app as any, {
     raw: exercise.raw,
     sourcePath: opts.sourcePath,
     onSave: async (newLine) => {
@@ -219,11 +217,9 @@ function openEditForCard(opts: CardOptions, exercise: ParsedExercise): void {
       }
     },
     onDelete: async () => {
-      // Delete = remove line (replace with empty via edit)
-      // Caller handles actual file mutation; emit empty signal
       opts.onEditLine?.(exercise.raw, "", opts.sourcePath);
     },
-  }).open();
+  });
 }
 
 /**
