@@ -184,9 +184,7 @@ export class KineticPopoutView extends ItemView {
     closeChrome.addEventListener("click", closeView);
 
     const dHeader = wrapper.createDiv({ cls: "kinetic-header kinetic-header-desktop" });
-    const dTitleRow = dHeader.createDiv({ cls: "kinetic-title-row" });
-    dTitleRow.createEl("h2", { text: "Edit Exercise", cls: "kinetic-title kinetic-title-lg" });
-    dTitleRow.createEl("span", { text: sourcePath, cls: "kinetic-vault-path" });
+    dHeader.createEl("h2", { text: "Edit Exercise", cls: "kinetic-title kinetic-title-lg" });
     dHeader.createEl("p", { text: "Configure tracking parameters, targets & set structure for live sessions.", cls: "kinetic-subtitle" });
 
     const body = wrapper.createDiv({ cls: "kinetic-body" });

@@ -166,11 +166,9 @@ export class KineticEditModal extends Modal {
     setIcon(mClose, "x");
     mClose.addEventListener("click", () => this.close());
 
-    // Desktop header
+    // Desktop header — top file reference removed per request (redundant with bottom sync note)
     const dHeader = wrapper.createDiv({ cls: "kinetic-header kinetic-header-desktop" });
-    const dTitleRow = dHeader.createDiv({ cls: "kinetic-title-row" });
-    dTitleRow.createEl("h2", { text: "Edit Exercise", cls: "kinetic-title kinetic-title-lg" });
-    dTitleRow.createEl("span", { text: this.sourcePath, cls: "kinetic-vault-path" });
+    dHeader.createEl("h2", { text: "Edit Exercise", cls: "kinetic-title kinetic-title-lg" });
     dHeader.createEl("p", { text: "Configure tracking parameters, targets & set structure for live sessions.", cls: "kinetic-subtitle" });
 
     // === SCROLLABLE BODY ===
