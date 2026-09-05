@@ -42,6 +42,29 @@ function extractProgress(raw: string): string {
   return idx === -1 ? "" : raw.slice(idx).trim();
 }
 
+/** Inline lucide "trash-2" — guarantees the glyph renders without depending on Obsidian's icon registry. */
+function renderTrashIcon(btn: HTMLButtonElement): void {
+  btn.empty();
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("class", "svg-icon");
+  svg.setAttribute("width", "15");
+  svg.setAttribute("height", "15");
+  svg.style.cssText =
+    "width:15px;height:15px;min-width:15px;max-width:15px;flex-shrink:0;flex-grow:0;margin:auto;display:block;";
+  svg.innerHTML =
+    '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>' +
+    '<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' +
+    '<line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>';
+  btn.appendChild(svg);
+  btn.style.color = "#fda4af";
+}
+
 type ExerciseKind = "strength" | "stretch" | "cardio";
 type SetKind = "warmup" | "normal" | "target" | "drop";
 interface KineticSet {
@@ -378,7 +401,7 @@ export class KineticPopoutView extends ItemView {
         doneBtn.addEventListener("click", () => { s.done = !s.done; renderSets(); });
         const removeCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-remove" });
         const removeBtn = removeCell.createEl("button", { cls: "kinetic-remove-btn", attr: { "aria-label": "Delete set" } });
-        setIcon(removeBtn, "trash-2");
+        renderTrashIcon(removeBtn);
         if (sets.length <= 1) { removeBtn.setAttribute("disabled", "true"); removeBtn.addClass("is-disabled"); }
         removeBtn.addEventListener("click", () => { if (sets.length <= 1) return; sets.splice(idx, 1); sets.forEach((set, i) => (set.id = i + 1)); renderSets(); });
       });
