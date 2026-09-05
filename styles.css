@@ -1242,52 +1242,80 @@
   --kinetic-on-variant: #cbc3d7;
 }
 
+.modal.kinetic-modal-host,
 .kinetic-modal-host .modal {
   padding: 0 !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  overflow: visible !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
   max-width: 1100px !important;
   width: min(1100px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 32px) !important;
+  height: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  top: 0 !important;
+  left: auto !important;
+  transform: none !important;
+  margin: 16px auto !important;
+  align-self: flex-start !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--kinetic-border) transparent;
 }
-/* Desktop popout window — wider, centered like Stitch canvas */
-.kinetic-popout-host {
-  width: 100%;
-  max-width: 1020px;
-  margin: 24px auto;
+/* Ensure overlay itself can scroll when modal grows beyond viewport */
+.modal-container:has(.kinetic-modal-host),
+body .modal-container {
+  overflow-y: auto !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 16px 0 !important;
 }
+/* Desktop popout window — openKineticEdit() opens a popout leaf (ItemView),
+   rendered inside .view-content.kinetic-popout-root.kinetic-root, NOT a modal.
+   That container is the page scroll element: sets grow the card, and this
+   container's scrollbar tracks the full page length. */
 .kinetic-popout-root {
-  padding: 24px !important;
+  padding: 24px 12px !important;
   background: #0a0a0c !important;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  min-height: 100%;
 }
 
 .kinetic-root {
   padding: 0 !important;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block !important;
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* Restore native .view-content scroll for the popout container (overrides
+   .kinetic-root overflow:visible so sets are reachable via page scroll). */
+.kinetic-popout-root.kinetic-root {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
 .kinetic-wrapper {
   width: 100%;
   max-width: 672px;
-  max-height: 92vh;
+  max-height: none;
+  height: auto;
   background: var(--kinetic-surface);
   background: #141416;
   border: 1px solid var(--kinetic-border);
   border-radius: 24px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 24px 50px -12px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.04);
   color: var(--kinetic-text);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   position: relative;
+  margin: 0 auto;
 }
 
 @media (min-width: 768px) {
@@ -1295,12 +1323,11 @@
     max-width: 960px;
     border-radius: 12px;
   }
-  /* Popout window variant — even wider, not constrained by modal viewport */
+  /* Popout window variant — even wider; card grows with sets, container scrolls */
   .kinetic-popout-root .kinetic-wrapper {
     max-width: 980px;
-    max-height: 85vh;
-    height: 85vh;
-    min-height: 640px;
+    max-height: none;
+    min-height: 0;
   }
 }
 
@@ -1441,15 +1468,14 @@
 
 /* Body */
 .kinetic-body {
-  overflow-y: auto;
+  overflow: visible;
   padding: 16px 20px 16px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: none;
   scrollbar-width: none;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto;
 }
 .kinetic-body::-webkit-scrollbar { display: none; }
 @media (min-width: 768px) {
@@ -1994,7 +2020,7 @@
   font-size: 11px;
 }
 
-/* Footer — sticky so Save stays visible when many sets */
+/* Footer — not sticky; whole page scrolls as one */
 .kinetic-footer {
   display: flex;
   align-items: center;
@@ -2006,9 +2032,7 @@
   border-top: 1px solid var(--kinetic-border);
   flex-shrink: 0;
   flex-wrap: wrap;
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
+  position: static;
 }
 @media (min-width: 768px) { .kinetic-footer { padding: 16px 24px; } }
 .kinetic-foot-left { display: flex; align-items: center; gap: 12px; }
