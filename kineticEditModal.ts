@@ -29,6 +29,7 @@ interface KineticSet {
   prev: string;
   weight: number;
   reps: number;
+  hold: number;
   rpe: number;
   done: boolean;
 }
@@ -37,10 +38,6 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
 
-function extractMarkers(raw: string): string[] {
-  const m = raw.match(/\[([ xX])\]/g);
-  return m ?? [];
-}
 function extractProgress(raw: string): string {
   const idx = raw.search(/,\s*progress\s*:/i);
   return idx === -1 ? "" : raw.slice(idx).trim();
@@ -81,14 +78,19 @@ export class KineticEditModal extends Modal {
   private unit: "lb" | "kg" = "lb";
   private isBodyweight = false;
   private sets: KineticSet[] = [];
-  private markers: string[] = [];
   private progressSuffix = "";
   private sourcePath: string;
 
   private nameInput!: HTMLInputElement;
-  private restLabel!: HTMLElement;
+  private restInput!: HTMLInputElement;
   private setsBody!: HTMLElement;
   private setsCountBadge!: HTMLElement;
+  private tableHead!: HTMLElement;
+  private mHead!: HTMLElement;
+  private copyBtn!: HTMLElement;
+  private incBtn!: HTMLElement;
+  private mobileCopy!: HTMLElement;
+  private holdCopyBtn!: HTMLElement;
   private kindBtns: Record<ExerciseKind, HTMLButtonElement> = {} as any;
 
   constructor(app: App, opts: KineticEditOptions) {
@@ -104,6 +106,7 @@ export class KineticEditModal extends Modal {
         prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8",
         weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155,
         reps: i === 4 ? 8 : 5,
+        hold: 45,
         rpe: 6.5 + i * 0.7,
         done: i < 2,
       }));
@@ -116,7 +119,6 @@ export class KineticEditModal extends Modal {
     this.kind = ex.isStretch ? "stretch" : "strength";
     this.rest = ex.restSeconds || 90;
     this.progressSuffix = extractProgress(raw);
-    this.markers = extractMarkers(raw);
     const first = ex.sets[0];
     if (first?.isBodyweight) {
       this.isBodyweight = true;
@@ -131,6 +133,7 @@ export class KineticEditModal extends Modal {
         prev: `${s.weight.value || 95} × ${s.reps || 5}`,
         weight: s.isBodyweight ? s.addedWeight?.value ?? 0 : s.weight.value,
         reps: s.reps || 5,
+        hold: ex.isStretch ? (s.seconds ?? 45) : s.reps || 5,
         rpe: 6.5 + i * 0.7,
         done: s.completed,
       }));
@@ -141,6 +144,7 @@ export class KineticEditModal extends Modal {
         prev: "",
         weight: 100,
         reps: 5,
+        hold: 45,
         rpe: 7,
         done: false,
       }));
@@ -344,19 +348,27 @@ export class KineticEditModal extends Modal {
     const restGroup = rightCol.createDiv({ cls: "kinetic-field" });
     const restLabelRow = restGroup.createDiv({ cls: "kinetic-label-row" });
     restLabelRow.createEl("label", { text: "Rest Duration (Seconds)", cls: "kinetic-label" });
-    this.restLabel = restLabelRow.createSpan({ cls: "kinetic-rest-badge" });
-    this.restLabel.setText(`${this.rest}s`);
+    const restField = restLabelRow.createDiv({ cls: "kinetic-rest-field" });
+    setIcon(restField.createSpan({ cls: "kinetic-rest-icon" }), "timer");
+    this.restInput = restField.createEl("input", { type: "number", cls: "kinetic-rest-input", attr: { min: "0", step: "5", "aria-label": "Rest seconds" } }) as HTMLInputElement;
+    this.restInput.value = String(this.rest);
+    restField.createSpan({ text: "s", cls: "kinetic-rest-unit" });
     const restPresets = restGroup.createDiv({ cls: "kinetic-presets" });
-    for (const v of [45, 60, 90, 120, 180]) {
-      const b = restPresets.createEl("button", { text: `${v}s`, cls: "kinetic-preset" });
-      if (v === this.rest) b.addClass("is-active");
-      b.addEventListener("click", () => {
-        this.rest = v;
-        this.restLabel.setText(`${v}s`);
-        restPresets.querySelectorAll(".kinetic-preset").forEach((el) => el.removeClass("is-active"));
-        b.addClass("is-active");
+    const syncRestPresets = () => {
+      restPresets.querySelectorAll(".kinetic-preset").forEach((el) => {
+        el.toggleClass("is-active", parseInt((el as HTMLElement).dataset.v ?? "-1", 10) === this.rest);
       });
+    };
+    const setRest = (v: number) => { this.rest = v; this.restInput.value = String(v); syncRestPresets(); };
+    for (const v of [45, 60, 90, 120, 180]) {
+      const b = restPresets.createEl("button", { text: `${v}s`, cls: "kinetic-preset", attr: { "data-v": String(v) } });
+      if (v === this.rest) b.addClass("is-active");
+      b.addEventListener("click", () => setRest(v));
     }
+    this.restInput.addEventListener("input", () => {
+      const v = parseInt(this.restInput.value, 10);
+      if (!Number.isNaN(v) && v >= 0) { this.rest = v; syncRestPresets(); }
+    });
 
     const unitRow = rightCol.createDiv({ cls: "kinetic-unit-row" });
     const unitGroup = unitRow.createDiv({ cls: "kinetic-field kinetic-field-half" });
@@ -394,17 +406,22 @@ export class KineticEditModal extends Modal {
     this.setsCountBadge = seqLeft.createSpan({ cls: "kinetic-seq-badge" });
     this.setsCountBadge.setText(`${this.sets.length} Sets Total`);
     const seqActions = seqBar.createDiv({ cls: "kinetic-seq-actions" });
-    const copyBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn" });
-    setIcon(copyBtn.createSpan({}), "copy");
-    copyBtn.createSpan({ text: " Copy Weight All" });
-    copyBtn.addEventListener("click", () => this.copyWeightToAll());
-    const incBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn kinetic-desktop-only" });
-    setIcon(incBtn.createSpan({}), "plus");
-    incBtn.createSpan({ text: " +5 lb Auto" });
-    incBtn.addEventListener("click", () => this.autoIncrement(5));
+    this.copyBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn" });
+    setIcon(this.copyBtn.createSpan({}), "copy");
+    this.copyBtn.createSpan({ text: " Copy Weight All" });
+    this.copyBtn.addEventListener("click", () => this.copyWeightToAll());
+    this.incBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn kinetic-desktop-only" });
+    setIcon(this.incBtn.createSpan({}), "plus");
+    this.incBtn.createSpan({ text: " +5 lb Auto" });
+    this.incBtn.addEventListener("click", () => this.autoIncrement(5));
+    this.holdCopyBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn" });
+    setIcon(this.holdCopyBtn.createSpan({}), "copy");
+    this.holdCopyBtn.createSpan({ text: " Copy Hold All" });
+    this.holdCopyBtn.addEventListener("click", () => this.copyHoldToAll());
 
     // Mobile secondary copy link
     const mobileCopy = body.createDiv({ cls: "kinetic-mobile-copy" });
+    this.mobileCopy = mobileCopy;
     const mCopyLink = mobileCopy.createEl("button", { cls: "kinetic-link" });
     setIcon(mCopyLink.createSpan({}), "copy");
     mCopyLink.createSpan({ text: " Copy weight to all" });
@@ -412,20 +429,22 @@ export class KineticEditModal extends Modal {
 
     // === Sets Table ===
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
-    const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
+    this.tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
     // Desktop: 5 cols (#/Weight/Reps/Done/Remove) — Type + Prev Log removed (potential feature)
-    tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
-    tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
-    tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
-    tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
-    tableHead.createDiv({ text: "", cls: "kinetic-th kinetic-th-remove" });
+    this.tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
+    this.tableHead.createDiv({ text: "Weight", cls: "kinetic-th kinetic-th-weight" });
+    this.tableHead.createDiv({ text: "Hold", cls: "kinetic-th kinetic-th-hold" });
+    this.tableHead.createDiv({ text: "Reps", cls: "kinetic-th kinetic-th-reps" });
+    this.tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
+    this.tableHead.createDiv({ text: "", cls: "kinetic-th kinetic-th-remove" });
 
-    // Mobile head overlay (hidden on desktop) — 4 cols after Type+Prev removal
-    const mHead = tableWrap.createDiv({ cls: "kinetic-mhead" });
-    mHead.createDiv({ text: "#", cls: "kinetic-mhead-cell" });
-    mHead.createDiv({ text: this.unit === "kg" ? "Kg" : "Lbs", cls: "kinetic-mhead-cell" });
-    mHead.createDiv({ text: "Reps", cls: "kinetic-mhead-cell" });
-    mHead.createDiv({ text: "✓", cls: "kinetic-mhead-cell kinetic-mhead-check" });
+    // Mobile head overlay (hidden on desktop) — stretch swaps Lbs/Reps for seconds
+    this.mHead = tableWrap.createDiv({ cls: "kinetic-mhead" });
+    this.mHead.createDiv({ text: "#", cls: "kinetic-mhead-cell" });
+    this.mHead.createDiv({ text: this.unit === "kg" ? "Kg" : "Lbs", cls: "kinetic-mhead-cell kinetic-mhead-weight" });
+    this.mHead.createDiv({ text: "s", cls: "kinetic-mhead-cell kinetic-mhead-hold" });
+    this.mHead.createDiv({ text: "Reps", cls: "kinetic-mhead-cell kinetic-mhead-reps" });
+    this.mHead.createDiv({ text: "✓", cls: "kinetic-mhead-cell kinetic-mhead-check" });
 
     this.setsBody = tableWrap.createDiv({ cls: "kinetic-table-body" });
     this.renderSets();
@@ -513,6 +532,14 @@ export class KineticEditModal extends Modal {
 
   private renderSets(): void {
     if (!this.setsBody) return;
+    const isStretch = this.kind === "stretch";
+    this.tableHead.toggleClass("is-stretch", isStretch);
+    this.mHead.toggleClass("is-stretch", isStretch);
+    this.setsBody.toggleClass("is-stretch", isStretch);
+    this.copyBtn.toggleClass("is-hidden", isStretch);
+    this.incBtn.toggleClass("is-hidden", isStretch);
+    this.mobileCopy.toggleClass("is-hidden", isStretch);
+    this.holdCopyBtn.toggleClass("is-hidden", !isStretch);
     this.setsBody.empty();
     this.sets.forEach((s, idx) => {
       const row = this.setsBody.createDiv({ cls: "kinetic-row" });
@@ -524,39 +551,54 @@ export class KineticEditModal extends Modal {
       const badge = idxCell.createSpan({ text: String(s.id), cls: "kinetic-idx-badge" });
       if (s.kind === "target") badge.addClass("is-target");
       else if (s.kind === "warmup") badge.addClass("is-warmup");
-      // Type + Prev Log removed — kept as data (kind/prev) but hidden (potential feature)
 
-      // Weight stepper
-      const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
-      const wWrap = wCell.createDiv({ cls: "kinetic-stepper" });
-      const wMinus = wWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
-      const wInput = wWrap.createEl("input", { type: "text", cls: "kinetic-step-input" });
-      wInput.value = String(s.weight);
-      wInput.setAttribute("inputmode", "decimal");
-      const wPlus = wWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
-      wMinus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight - 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
-      wPlus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight + 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
-      wInput.addEventListener("input", () => {
-        const v = parseFloat(wInput.value);
-        if (!Number.isNaN(v)) s.weight = clamp(v, -200, 1000);
-      });
-      wInput.addEventListener("change", () => { wInput.value = String(clamp(parseFloat(wInput.value) || 0, -200, 1000)); s.weight = parseFloat(wInput.value); });
+      if (isStretch) {
+        // Hold (seconds) stepper — replaces Weight + Reps for timed stretches
+        const hCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-hold" });
+        const hWrap = hCell.createDiv({ cls: "kinetic-stepper" });
+        const hMinus = hWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+        const hInput = hWrap.createEl("input", { type: "text", cls: "kinetic-step-input", attr: { inputmode: "decimal", "aria-label": "Hold seconds" } });
+        hInput.value = String(s.hold);
+        const hPlus = hWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+        hMinus.addEventListener("click", () => { s.hold = clamp(Math.round((s.hold - 5) * 100) / 100, 1, 1800); hInput.value = String(s.hold); });
+        hPlus.addEventListener("click", () => { s.hold = clamp(Math.round((s.hold + 5) * 100) / 100, 1, 1800); hInput.value = String(s.hold); });
+        hInput.addEventListener("input", () => {
+          const v = parseFloat(hInput.value);
+          if (!Number.isNaN(v)) s.hold = clamp(v, 1, 1800);
+        });
+      } else {
+        // Weight stepper
+        const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
+        const wWrap = wCell.createDiv({ cls: "kinetic-stepper" });
+        const wMinus = wWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+        const wInput = wWrap.createEl("input", { type: "text", cls: "kinetic-step-input" });
+        wInput.value = String(s.weight);
+        wInput.setAttribute("inputmode", "decimal");
+        const wPlus = wWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+        wMinus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight - 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
+        wPlus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight + 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
+        wInput.addEventListener("input", () => {
+          const v = parseFloat(wInput.value);
+          if (!Number.isNaN(v)) s.weight = clamp(v, -200, 1000);
+        });
+        wInput.addEventListener("change", () => { wInput.value = String(clamp(parseFloat(wInput.value) || 0, -200, 1000)); s.weight = parseFloat(wInput.value); });
 
-      // Reps stepper
-      const rCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-reps" });
-      const rWrap = rCell.createDiv({ cls: "kinetic-stepper kinetic-stepper-sm" });
-      const rMinus = rWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
-      const rInput = rWrap.createEl("input", { type: "text", cls: "kinetic-step-input" });
-      rInput.value = String(s.reps);
-      rInput.setAttribute("inputmode", "numeric");
-      const rPlus = rWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
-      rMinus.addEventListener("click", () => { s.reps = clamp(s.reps - 1, 0, 50); rInput.value = String(s.reps); });
-      rPlus.addEventListener("click", () => { s.reps = clamp(s.reps + 1, 0, 50); rInput.value = String(s.reps); });
-      rInput.addEventListener("input", () => {
-        const v = parseInt(rInput.value, 10);
-        if (!Number.isNaN(v)) s.reps = clamp(v, 0, 50);
-      });
-      rInput.addEventListener("change", () => { rInput.value = String(clamp(parseInt(rInput.value, 10) || 0, 0, 50)); s.reps = parseInt(rInput.value, 10); });
+        // Reps stepper
+        const rCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-reps" });
+        const rWrap = rCell.createDiv({ cls: "kinetic-stepper kinetic-stepper-sm" });
+        const rMinus = rWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+        const rInput = rWrap.createEl("input", { type: "text", cls: "kinetic-step-input" });
+        rInput.value = String(s.reps);
+        rInput.setAttribute("inputmode", "numeric");
+        const rPlus = rWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+        rMinus.addEventListener("click", () => { s.reps = clamp(s.reps - 1, 0, 50); rInput.value = String(s.reps); });
+        rPlus.addEventListener("click", () => { s.reps = clamp(s.reps + 1, 0, 50); rInput.value = String(s.reps); });
+        rInput.addEventListener("input", () => {
+          const v = parseInt(rInput.value, 10);
+          if (!Number.isNaN(v)) s.reps = clamp(v, 0, 50);
+        });
+        rInput.addEventListener("change", () => { rInput.value = String(clamp(parseInt(rInput.value, 10) || 0, 0, 50)); s.reps = parseInt(rInput.value, 10); });
+      }
 
       // Done
       const doneCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-done" });
@@ -600,6 +642,14 @@ export class KineticEditModal extends Modal {
     new Notice(`Copied ${first}${this.unit} to all sets`);
   }
 
+  private copyHoldToAll(): void {
+    if (!this.sets.length) return;
+    const first = this.sets[0].hold;
+    for (let i = 1; i < this.sets.length; i++) this.sets[i].hold = first;
+    this.renderSets();
+    new Notice(`Copied ${first}s hold to all sets`);
+  }
+
   private autoIncrement(delta: number): void {
     this.sets.forEach((s) => (s.weight += delta));
     this.renderSets();
@@ -615,6 +665,7 @@ export class KineticEditModal extends Modal {
       prev: last ? `${last.weight} × ${last.reps}` : "",
       weight: last?.weight ?? 100,
       reps: last?.reps ?? 5,
+      hold: last?.hold ?? 45,
       rpe: last?.rpe ?? 8,
       done: false,
     });
@@ -628,13 +679,14 @@ export class KineticEditModal extends Modal {
       prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8",
       weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155,
       reps: i === 4 ? 8 : 5,
+      hold: 45,
       rpe: 6.5 + i * 0.7,
       done: i < 2,
     }));
     this.rest = 90;
     this.unit = "lb";
     this.isBodyweight = false;
-    if (this.restLabel) this.restLabel.setText("90s");
+    if (this.restInput) this.restInput.value = "90";
     this.renderSets();
     new Notice("Reset to default");
   }
@@ -642,22 +694,23 @@ export class KineticEditModal extends Modal {
   private buildLine(): string | null {
     const name = this.name.trim();
     if (!name) { new Notice("Enter an exercise name."); this.nameInput.focus(); return null; }
+    const markers = this.applyMarkers();
     if (this.kind === "stretch") {
-      const hold = this.sets[0]?.reps ?? 45;
       const count = this.sets.length;
-      const markers = this.applyMarkers(count);
-      const spec = this.rest > 0 ? `${count}x${hold}s|${this.rest}s` : `${count}x${hold}s`;
+      const holds = this.sets.map((s) => s.hold || 45);
+      const allEqual = holds.every((h) => h === holds[0]);
+      const spec = allEqual
+        ? (this.rest > 0 ? `${count}x${holds[0]}s|${this.rest}s` : `${count}x${holds[0]}s`)
+        : holds.map((h) => `${h}s${this.rest > 0 ? `|${this.rest}s` : ""}`).join(" ");
       const tag = name.toLowerCase().includes("stretch") ? "" : ", type: stretch";
       return `${markers} ${name} / ${spec}${tag}${this.progressSuffix ? ", " + this.progressSuffix.replace(/^,\s*/, "") : ""}`;
     }
     if (this.kind === "cardio") {
-      const hold = this.sets[0]?.reps ?? 600;
+      const hold = this.sets[0]?.hold ?? 600;
       const count = this.sets.length;
-      const markers = this.applyMarkers(count);
       const spec = `${count}x${hold}s`;
       return `${markers} ${name} / ${spec}, type: stretch${this.progressSuffix ? ", " + this.progressSuffix.replace(/^,\s*/, "") : ""}`;
     }
-    const markers = this.applyMarkers(this.sets.length);
     const tokens = this.sets.map((s) => {
       if (this.isBodyweight) {
         if (s.weight === 0) return `${s.reps}xbw`;
@@ -671,13 +724,8 @@ export class KineticEditModal extends Modal {
     return `${markers} ${name} / ${tokens}${restPart}${prog}`;
   }
 
-  private applyMarkers(count: number): string {
-    if (this.markers.length) {
-      const out = this.markers.slice(0, count);
-      while (out.length < count) out.push("[ ]");
-      return out.join(" ");
-    }
-    return Array(count).fill("[ ]").join(" ");
+  private applyMarkers(): string {
+    return this.sets.map((s) => (s.done ? "[x]" : "[ ]")).join(" ");
   }
 
   private async handleSave(): Promise<void> {

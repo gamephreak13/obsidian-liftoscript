@@ -33,10 +33,6 @@ export function popPendingKinetic(leafId: string): KineticEditOptions | undefine
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
 }
-function extractMarkers(raw: string): string[] {
-  const m = raw.match(/\[([ xX])\]/g);
-  return m ?? [];
-}
 function extractProgress(raw: string): string {
   const idx = raw.search(/,\s*progress\s*:/i);
   return idx === -1 ? "" : raw.slice(idx).trim();
@@ -73,6 +69,7 @@ interface KineticSet {
   prev: string;
   weight: number;
   reps: number;
+  hold: number;
   rpe: number;
   done: boolean;
 }
@@ -156,7 +153,6 @@ export class KineticPopoutView extends ItemView {
     let unit: "lb" | "kg" = "lb";
     let isBodyweight = false;
     let sets: KineticSet[] = [];
-    let markers: string[] = [];
     let progressSuffix = "";
     const sourcePath = opts.sourcePath ?? "vault://notes/workouts/chest-day.md";
 
@@ -166,7 +162,6 @@ export class KineticPopoutView extends ItemView {
       kind = ex.isStretch ? "stretch" : "strength";
       rest = ex.restSeconds || 90;
       progressSuffix = extractProgress(raw);
-      markers = extractMarkers(raw);
       const first = ex.sets[0];
       if (first?.isBodyweight) {
         isBodyweight = true;
@@ -179,13 +174,14 @@ export class KineticPopoutView extends ItemView {
           prev: `${s.weight.value || 95} × ${s.reps || 5}`,
           weight: s.isBodyweight ? s.addedWeight?.value ?? 0 : s.weight.value,
           reps: s.reps || 5,
+          hold: ex.isStretch ? (s.seconds ?? 45) : s.reps || 5,
           rpe: 6.5 + i * 0.7,
           done: s.completed,
         }));
-      } else sets = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, kind: "normal" as SetKind, prev: "", weight: 100, reps: 5, rpe: 7, done: false }));
+      } else sets = Array.from({ length: 3 }, (_, i) => ({ id: i + 1, kind: "normal" as SetKind, prev: "", weight: 100, reps: 5, hold: 45, rpe: 7, done: false }));
     };
     if (opts.raw) hydrate(opts.raw);
-    else sets = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, kind: (i === 0 ? "warmup" : i === 2 ? "target" : i === 4 ? "drop" : "normal") as SetKind, prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8", weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155, reps: i === 4 ? 8 : 5, rpe: 6.5 + i * 0.7, done: i < 2 }));
+    else sets = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, kind: (i === 0 ? "warmup" : i === 2 ? "target" : i === 4 ? "drop" : "normal") as SetKind, prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8", weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155, reps: i === 4 ? 8 : 5, hold: 45, rpe: 6.5 + i * 0.7, done: i < 2 }));
 
     const wrapper = container.createDiv({ cls: "kinetic-wrapper" });
 
@@ -315,14 +311,27 @@ export class KineticPopoutView extends ItemView {
     const restGroup = rightCol.createDiv({ cls: "kinetic-field" });
     const restLabelRow = restGroup.createDiv({ cls: "kinetic-label-row" });
     restLabelRow.createEl("label", { text: "Rest Duration (Seconds)", cls: "kinetic-label" });
-    const restLabel = restLabelRow.createSpan({ cls: "kinetic-rest-badge" });
-    restLabel.setText(`${rest}s`);
+    const restField = restLabelRow.createDiv({ cls: "kinetic-rest-field" });
+    setIcon(restField.createSpan({ cls: "kinetic-rest-icon" }), "timer");
+    const restInput = restField.createEl("input", { type: "number", cls: "kinetic-rest-input", attr: { min: "0", step: "5", "aria-label": "Rest seconds" } }) as HTMLInputElement;
+    restInput.value = String(rest);
+    restField.createSpan({ text: "s", cls: "kinetic-rest-unit" });
     const restPresets = restGroup.createDiv({ cls: "kinetic-presets" });
+    const syncRestPresets = () => {
+      restPresets.querySelectorAll(".kinetic-preset").forEach((el) => {
+        el.toggleClass("is-active", parseInt((el as HTMLElement).dataset.v ?? "-1", 10) === rest);
+      });
+    };
+    const setRest = (v: number) => { rest = v; restInput.value = String(v); syncRestPresets(); };
     for (const v of [45, 60, 90, 120, 180]) {
-      const b = restPresets.createEl("button", { text: `${v}s`, cls: "kinetic-preset" });
+      const b = restPresets.createEl("button", { text: `${v}s`, cls: "kinetic-preset", attr: { "data-v": String(v) } });
       if (v === rest) b.addClass("is-active");
-      b.addEventListener("click", () => { rest = v; restLabel.setText(`${v}s`); restPresets.querySelectorAll(".kinetic-preset").forEach((el) => el.removeClass("is-active")); b.addClass("is-active"); });
+      b.addEventListener("click", () => setRest(v));
     }
+    restInput.addEventListener("input", () => {
+      const v = parseInt(restInput.value, 10);
+      if (!Number.isNaN(v) && v >= 0) { rest = v; syncRestPresets(); }
+    });
     const unitRow = rightCol.createDiv({ cls: "kinetic-unit-row" });
     const unitGroup = unitRow.createDiv({ cls: "kinetic-field kinetic-field-half" });
     unitGroup.createEl("label", { text: "Weight Unit", cls: "kinetic-label" });
@@ -355,17 +364,28 @@ export class KineticPopoutView extends ItemView {
     setIcon(incBtn.createSpan({}), "plus");
     incBtn.createSpan({ text: " +5 lb Auto" });
     incBtn.addEventListener("click", () => autoIncrement(5));
+    const holdCopyBtn = seqActions.createEl("button", { cls: "kinetic-seq-btn" });
+    setIcon(holdCopyBtn.createSpan({}), "copy");
+    holdCopyBtn.createSpan({ text: " Copy Hold All" });
+    holdCopyBtn.addEventListener("click", () => copyHoldToAll());
 
     const tableWrap = body.createDiv({ cls: "kinetic-table-wrap" });
     const tableHead = tableWrap.createDiv({ cls: "kinetic-table-head" });
     // 5 cols after Type+Prev removal
     tableHead.createDiv({ text: "#", cls: "kinetic-th kinetic-th-idx" });
-    tableHead.createDiv({ text: "Weight", cls: "kinetic-th" });
-    tableHead.createDiv({ text: "Reps", cls: "kinetic-th" });
+    tableHead.createDiv({ text: "Weight", cls: "kinetic-th kinetic-th-weight" });
+    tableHead.createDiv({ text: "Hold", cls: "kinetic-th kinetic-th-hold" });
+    tableHead.createDiv({ text: "Reps", cls: "kinetic-th kinetic-th-reps" });
     tableHead.createDiv({ text: "Done", cls: "kinetic-th kinetic-th-done" });
     tableHead.createDiv({ text: "", cls: "kinetic-th kinetic-th-remove" });
     const setsBody = tableWrap.createDiv({ cls: "kinetic-table-body" });
     const renderSets = () => {
+      const isStretch = kind === "stretch";
+      tableHead.toggleClass("is-stretch", isStretch);
+      setsBody.toggleClass("is-stretch", isStretch);
+      copyBtn.toggleClass("is-hidden", isStretch);
+      incBtn.toggleClass("is-hidden", isStretch);
+      holdCopyBtn.toggleClass("is-hidden", !isStretch);
       setsBody.empty();
       sets.forEach((s, idx) => {
         const row = setsBody.createDiv({ cls: "kinetic-row" });
@@ -374,24 +394,36 @@ export class KineticPopoutView extends ItemView {
         const idxCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-idx" });
         const badge = idxCell.createSpan({ text: String(s.id), cls: "kinetic-idx-badge" });
         if (s.kind === "target") badge.addClass("is-target");
-        const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
-        const wWrap = wCell.createDiv({ cls: "kinetic-stepper" });
-        const wMinus = wWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
-        const wInput = wWrap.createEl("input", { type: "text", cls: "kinetic-step-input" }) as HTMLInputElement;
-        wInput.value = String(s.weight);
-        const wPlus = wWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
-        wMinus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight - 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
-        wPlus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight + 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
-        wInput.addEventListener("input", () => { const v = parseFloat(wInput.value); if (!Number.isNaN(v)) s.weight = clamp(v, -200, 1000); });
-        const rCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-reps" });
-        const rWrap = rCell.createDiv({ cls: "kinetic-stepper kinetic-stepper-sm" });
-        const rMinus = rWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
-        const rInput = rWrap.createEl("input", { type: "text", cls: "kinetic-step-input" }) as HTMLInputElement;
-        rInput.value = String(s.reps);
-        const rPlus = rWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
-        rMinus.addEventListener("click", () => { s.reps = clamp(s.reps - 1, 0, 50); rInput.value = String(s.reps); });
-        rPlus.addEventListener("click", () => { s.reps = clamp(s.reps + 1, 0, 50); rInput.value = String(s.reps); });
-        rInput.addEventListener("input", () => { const v = parseInt(rInput.value, 10); if (!Number.isNaN(v)) s.reps = clamp(v, 0, 50); });
+        if (isStretch) {
+          const hCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-hold" });
+          const hWrap = hCell.createDiv({ cls: "kinetic-stepper" });
+          const hMinus = hWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+          const hInput = hWrap.createEl("input", { type: "text", cls: "kinetic-step-input", attr: { inputmode: "decimal", "aria-label": "Hold seconds" } }) as HTMLInputElement;
+          hInput.value = String(s.hold);
+          const hPlus = hWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+          hMinus.addEventListener("click", () => { s.hold = clamp(Math.round((s.hold - 5) * 100) / 100, 1, 1800); hInput.value = String(s.hold); });
+          hPlus.addEventListener("click", () => { s.hold = clamp(Math.round((s.hold + 5) * 100) / 100, 1, 1800); hInput.value = String(s.hold); });
+          hInput.addEventListener("input", () => { const v = parseFloat(hInput.value); if (!Number.isNaN(v)) s.hold = clamp(v, 1, 1800); });
+        } else {
+          const wCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-weight" });
+          const wWrap = wCell.createDiv({ cls: "kinetic-stepper" });
+          const wMinus = wWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+          const wInput = wWrap.createEl("input", { type: "text", cls: "kinetic-step-input" }) as HTMLInputElement;
+          wInput.value = String(s.weight);
+          const wPlus = wWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+          wMinus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight - 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
+          wPlus.addEventListener("click", () => { s.weight = clamp(Math.round((s.weight + 5) * 100) / 100, -200, 1000); wInput.value = String(s.weight); });
+          wInput.addEventListener("input", () => { const v = parseFloat(wInput.value); if (!Number.isNaN(v)) s.weight = clamp(v, -200, 1000); });
+          const rCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-reps" });
+          const rWrap = rCell.createDiv({ cls: "kinetic-stepper kinetic-stepper-sm" });
+          const rMinus = rWrap.createEl("button", { text: "−", cls: "kinetic-step-btn" });
+          const rInput = rWrap.createEl("input", { type: "text", cls: "kinetic-step-input" }) as HTMLInputElement;
+          rInput.value = String(s.reps);
+          const rPlus = rWrap.createEl("button", { text: "+", cls: "kinetic-step-btn" });
+          rMinus.addEventListener("click", () => { s.reps = clamp(s.reps - 1, 0, 50); rInput.value = String(s.reps); });
+          rPlus.addEventListener("click", () => { s.reps = clamp(s.reps + 1, 0, 50); rInput.value = String(s.reps); });
+          rInput.addEventListener("input", () => { const v = parseInt(rInput.value, 10); if (!Number.isNaN(v)) s.reps = clamp(v, 0, 50); });
+        }
         const doneCell = row.createDiv({ cls: "kinetic-cell kinetic-cell-done" });
         const doneBtn = doneCell.createEl("button", { cls: "kinetic-done-btn" });
         if (s.done) doneBtn.addClass("is-checked");
@@ -408,12 +440,13 @@ export class KineticPopoutView extends ItemView {
       setsCountBadge.setText(`${sets.length} Sets Total`);
     };
     const copyWeightToAll = () => { if (!sets.length) return; const first = sets[0].weight; for (let i = 1; i < sets.length; i++) sets[i].weight = first; renderSets(); };
+    const copyHoldToAll = () => { if (!sets.length) return; const first = sets[0].hold; for (let i = 1; i < sets.length; i++) sets[i].hold = first; renderSets(); };
     const autoIncrement = (delta: number) => { sets.forEach((s) => (s.weight += delta)); renderSets(); };
     renderSets();
     const addBtn = body.createEl("button", { cls: "kinetic-add-btn" });
     setIcon(addBtn.createSpan({}), "plus");
     addBtn.createSpan({ text: ` Add Next Set` });
-    addBtn.addEventListener("click", () => { if (sets.length >= 12) return; const last = sets[sets.length - 1]; sets.push({ id: sets.length + 1, kind: "normal", prev: last ? `${last.weight} × ${last.reps}` : "", weight: last?.weight ?? 100, reps: last?.reps ?? 5, rpe: 7, done: false }); renderSets(); });
+    addBtn.addEventListener("click", () => { if (sets.length >= 12) return; const last = sets[sets.length - 1]; sets.push({ id: sets.length + 1, kind: "normal", prev: last ? `${last.weight} × ${last.reps}` : "", weight: last?.weight ?? 100, reps: last?.reps ?? 5, hold: last?.hold ?? 45, rpe: 7, done: false }); renderSets(); });
     const note = body.createDiv({ cls: "kinetic-note" });
     setIcon(note.createSpan({}), "hash");
     const noteText = note.createSpan({});
@@ -427,7 +460,7 @@ export class KineticPopoutView extends ItemView {
     delBtn.createSpan({ text: " Delete" });
     delBtn.addEventListener("click", async () => { if (opts.onDelete) await opts.onDelete(); this.leaf.detach(); });
     const resetBtn = footLeft.createEl("button", { text: "Reset to default", cls: "kinetic-foot-reset" });
-    resetBtn.addEventListener("click", () => { sets = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, kind: (i === 0 ? "warmup" : i === 2 ? "target" : i === 4 ? "drop" : "normal") as SetKind, prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8", weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155, reps: i === 4 ? 8 : 5, rpe: 7, done: i < 2 })); rest = 90; unit = "lb"; isBodyweight = false; (restLabel as any).setText?.("90s"); renderSets(); });
+    resetBtn.addEventListener("click", () => { sets = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, kind: (i === 0 ? "warmup" : i === 2 ? "target" : i === 4 ? "drop" : "normal") as SetKind, prev: i === 0 ? "95 × 5" : i === 1 ? "135 × 5" : i === 2 ? "185 × 5" : i === 3 ? "185 × 5" : "155 × 8", weight: i === 0 ? 95 : i === 1 ? 135 : i === 2 ? 185 : i === 3 ? 185 : 155, reps: i === 4 ? 8 : 5, hold: 45, rpe: 7, done: i < 2 })); rest = 90; setRest(90); unit = "lb"; isBodyweight = false; renderSets(); });
     const footRight = footer.createDiv({ cls: "kinetic-foot-right" });
     const cancelBtn = footRight.createEl("button", { text: "Cancel", cls: "kinetic-btn kinetic-btn-ghost" });
     cancelBtn.addEventListener("click", () => this.leaf.detach());
@@ -437,9 +470,19 @@ export class KineticPopoutView extends ItemView {
     const handleSave = async () => {
       const n = name.trim();
       if (!n) return;
+      const markersStr = sets.map((s) => (s.done ? "[x]" : "[ ]")).join(" ");
       let line: string;
-      if (kind === "stretch") { const hold = sets[0]?.reps ?? 45; const count = sets.length; const markersStr = markers.length ? markers.slice(0, count).concat(Array(Math.max(0, count - markers.length)).fill("[ ]")).join(" ") : Array(count).fill("[ ]").join(" "); const spec = rest > 0 ? `${count}x${hold}s|${rest}s` : `${count}x${hold}s`; const tag = n.toLowerCase().includes("stretch") ? "" : ", type: stretch"; line = `${markersStr} ${n} / ${spec}${tag}${progressSuffix ? ", " + progressSuffix.replace(/^,\s*/, "") : ""}`; }
-      else { const markersStr = markers.length ? markers.slice(0, sets.length).concat(Array(Math.max(0, sets.length - markers.length)).fill("[ ]")).join(" ") : Array(sets.length).fill("[ ]").join(" "); const tokens = sets.map((s) => isBodyweight ? (s.weight === 0 ? `${s.reps}xbw` : s.weight > 0 ? `${s.reps}xbw+${s.weight}${unit}` : `${s.reps}xbw${s.weight}${unit}`) : `${s.reps}x${s.weight}${unit}`).join(", "); const restPart = rest > 0 ? `, rest: ${rest}` : ""; const prog = progressSuffix ? (progressSuffix.startsWith(",") ? progressSuffix : ", " + progressSuffix.replace(/^,\s*/, "")) : ""; line = `${markersStr} ${n} / ${tokens}${restPart}${prog}`; }
+      if (kind === "stretch") {
+        const count = sets.length;
+        const holds = sets.map((s) => s.hold || 45);
+        const allEqual = holds.every((h) => h === holds[0]);
+        const spec = allEqual
+          ? (rest > 0 ? `${count}x${holds[0]}s|${rest}s` : `${count}x${holds[0]}s`)
+          : holds.map((h) => `${h}s${rest > 0 ? `|${rest}s` : ""}`).join(" ");
+        const tag = n.toLowerCase().includes("stretch") ? "" : ", type: stretch";
+        line = `${markersStr} ${n} / ${spec}${tag}${progressSuffix ? ", " + progressSuffix.replace(/^,\s*/, "") : ""}`;
+      }
+      else { const tokens = sets.map((s) => isBodyweight ? (s.weight === 0 ? `${s.reps}xbw` : s.weight > 0 ? `${s.reps}xbw+${s.weight}${unit}` : `${s.reps}xbw${s.weight}${unit}`) : `${s.reps}x${s.weight}${unit}`).join(", "); const restPart = rest > 0 ? `, rest: ${rest}` : ""; const prog = progressSuffix ? (progressSuffix.startsWith(",") ? progressSuffix : ", " + progressSuffix.replace(/^,\s*/, "")) : ""; line = `${markersStr} ${n} / ${tokens}${restPart}${prog}`; }
       this.leaf.detach();
       await opts.onSave(line);
     };

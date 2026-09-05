@@ -1509,12 +1509,41 @@ body .modal-container {
   color: var(--kinetic-text-muted);
 }
 .kinetic-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.kinetic-rest-badge {
+.kinetic-rest-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #0e0e10;
+  border: 1px solid var(--kinetic-border);
+  border-radius: 8px;
+  padding: 2px 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.kinetic-rest-field:focus-within {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+.kinetic-rest-icon { display: flex; color: var(--interactive-accent); flex-shrink: 0; }
+.kinetic-rest-icon svg { width: 13px; height: 13px; }
+.kinetic-rest-input {
+  width: 48px;
+  background: transparent;
+  border: none;
+  text-align: right;
   font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  font-weight: 600;
-  color: #d0bcff;
-  display: flex; align-items: center; gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--interactive-accent);
+  outline: none;
+}
+.kinetic-rest-input::-webkit-inner-spin-button,
+.kinetic-rest-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.kinetic-rest-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.kinetic-rest-unit {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--kinetic-text-muted);
+  flex-shrink: 0;
 }
 .kinetic-input-wrap {
   position: relative;
@@ -1762,12 +1791,14 @@ body .modal-container {
 }
 .kinetic-seq-btn:hover { background: #2a2a2c; }
 .kinetic-seq-btn svg { width: 14px; height: 14px; }
+.kinetic-seq-btn.is-hidden { display: none; }
 
 .kinetic-mobile-copy {
   display: flex;
   justify-content: flex-end;
   margin-top: -8px;
 }
+.kinetic-mobile-copy.is-hidden { display: none; }
 @media (min-width: 768px) { .kinetic-mobile-copy { display: none; } }
 .kinetic-link {
   display: inline-flex;
@@ -1802,6 +1833,10 @@ body .modal-container {
     background: #2a2a2c;
     border-bottom: 1px solid var(--kinetic-border);
   }
+  .kinetic-table-head.is-stretch {
+    /* Stretch: # / Hold / Done / Remove — Weight + Reps replaced by Hold */
+    grid-template-columns: 0.5fr 1.6fr 0.6fr 0.5fr;
+  }
 }
 .kinetic-th {
   font-size: 10px;
@@ -1813,6 +1848,10 @@ body .modal-container {
 }
 .kinetic-th-prev { text-align: right; }
 .kinetic-th-type { text-align: left; }
+.kinetic-th-hold { display: none; }
+.kinetic-table-head.is-stretch .kinetic-th-weight,
+.kinetic-table-head.is-stretch .kinetic-th-reps { display: none; }
+.kinetic-table-head.is-stretch .kinetic-th-hold { display: block; }
 
 .kinetic-mhead {
   display: grid;
@@ -1823,6 +1862,14 @@ body .modal-container {
   background: #202024;
   border-bottom: 1px solid var(--kinetic-border);
 }
+.kinetic-mhead.is-stretch {
+  /* Stretch mobile: # / Hold / Done */
+  grid-template-columns: 0.5fr 1.4fr 0.6fr;
+}
+.kinetic-mhead-hold { display: none; }
+.kinetic-mhead.is-stretch .kinetic-mhead-weight,
+.kinetic-mhead.is-stretch .kinetic-mhead-reps { display: none; }
+.kinetic-mhead.is-stretch .kinetic-mhead-hold { display: block; }
 @media (min-width: 768px) { .kinetic-mhead { display: none; } }
 .kinetic-mhead-cell {
   font-size: 10px;
@@ -1848,6 +1895,10 @@ body .modal-container {
 }
 .kinetic-row.is-alt { background: #1b1b1d; }
 .kinetic-row.is-done { opacity: 0.9; }
+.kinetic-table-body.is-stretch .kinetic-row {
+  /* Stretch mobile: # / Hold / Done */
+  grid-template-columns: 0.5fr 1.4fr 0.6fr;
+}
 @media (min-width: 768px) {
   .kinetic-row {
     /* desktop 5 cols: # Weight Reps Done Remove — wider Weight/Reps */
@@ -1856,11 +1907,19 @@ body .modal-container {
     padding: 6px 16px;
   }
   .kinetic-row.is-alt { background: #1c1c1f; }
+  .kinetic-table-body.is-stretch .kinetic-row {
+    /* Stretch desktop: # / Hold / Done / Remove */
+    grid-template-columns: 0.5fr 1.6fr 0.6fr 0.5fr;
+  }
 }
 .kinetic-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
 .kinetic-cell-type { justify-content: flex-start; }
 .kinetic-cell-prev { justify-content: flex-start; }
 .kinetic-cell-remove { justify-content: center; }
+.kinetic-cell-hold { display: none; }
+.kinetic-table-body.is-stretch .kinetic-cell-weight,
+.kinetic-table-body.is-stretch .kinetic-cell-reps { display: none; }
+.kinetic-table-body.is-stretch .kinetic-cell-hold { display: flex; }
 @media (max-width: 767px) {
   .kinetic-cell-type, .kinetic-cell-remove { display: none; }
   /* keep idx, prev, weight, reps, done — remove hidden on mobile */
