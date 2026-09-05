@@ -1291,12 +1291,15 @@ body .modal-container {
 }
 
 /* Restore native .view-content scroll for the popout container (overrides
-   .kinetic-root overflow:visible so sets are reachable via page scroll). */
+   .kinetic-root overflow:visible so sets are reachable via page scroll).
+   Also overrides .kinetic-root padding:0 — this padding separates the edit
+   window card from the popout window's chrome. */
 .kinetic-popout-root.kinetic-root {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   height: 100% !important;
   min-height: 0 !important;
+  padding: 32px 24px !important;
 }
 
 .kinetic-wrapper {
